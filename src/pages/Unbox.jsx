@@ -23,7 +23,7 @@ const PHASE = {
   ERROR: 'error',
 };
 
-const MULTI_COUNT = 50;
+const MULTI_COUNT = 5;
 const EASE = [0.22, 1, 0.36, 1];
 
 export default function Unbox() {
