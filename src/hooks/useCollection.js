@@ -44,7 +44,8 @@ export function useCollection(collectionId) {
         const { data, error: err } = await supabase
           .from('collections')
           .select(`
-            id, name, description, cover, hero_cover, display_cover, is_active,
+            id, name, description, cover, hero_cover, display_cover,
+            is_active, is_published,
             figures:figures(
               id, name, rarity, weight, points,
               image, card, silhouette, is_secret, sort_order

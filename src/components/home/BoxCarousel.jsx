@@ -26,12 +26,16 @@ export default function BoxCarousel({ collections, index, onChange, onNext, onPr
           count > 1 ? 'cursor-grab active:cursor-grabbing' : ''
         }`}
       >
-        {/* Свечение */}
+        {/* Свечение — приглушаем когда активная заблокирована */}
         <div
           className="pointer-events-none absolute left-1/2 top-[68%]
                      h-52 w-[85%] -translate-x-1/2 -translate-y-1/2
-                     rounded-[50%] blur-[80px] sm:blur-[90px]"
-          style={{ background: 'rgba(255,140,0,0.45)' }}
+                     rounded-[50%] blur-[80px] sm:blur-[90px]
+                     transition-opacity duration-700"
+          style={{
+            background: 'rgba(255,140,0,0.45)',
+            opacity: collections[index]?.isLocked ? 0.35 : 1,
+          }}
         />
 
         {/* Сцена */}
@@ -42,6 +46,7 @@ export default function BoxCarousel({ collections, index, onChange, onNext, onPr
             const abs = Math.abs(offset);
             if (abs > 2) return null;
             const isActive = offset === 0;
+            const isLocked = !!c.isLocked;
             const src = c.cover || c.hero_cover || '/box/box-front.png';
 
             return (
@@ -59,22 +64,82 @@ export default function BoxCarousel({ collections, index, onChange, onNext, onPr
                 }}
                 transition={{ duration: 0.7, ease: EASE }}
               >
-                <motion.img
-                  src={src}
-                  alt={c.name}
-                  draggable={false}
-                  animate={isActive ? { y: [0, -14, 0] } : { y: 0 }}
-                  transition={
-                    isActive
-                      ? { duration: 5, repeat: Infinity, ease: 'easeInOut' }
-                      : { duration: 0.4 }
-                  }
-                  className="pointer-events-none h-auto select-none
-                             w-[300px] sm:w-[360px] md:w-[440px] lg:w-[480px]"
-                  style={{
-                    filter: 'drop-shadow(0 36px 55px rgba(120,60,0,0.4))',
-                  }}
-                />
+                {/* Обёртка — держит коробку + стеклянный оверлей */}
+                <div className="relative inline-block">
+                  <motion.img
+                    src={src}
+                    alt={c.name}
+                    draggable={false}
+                    animate={isActive ? { y: [0, -14, 0] } : { y: 0 }}
+                    transition={
+                      isActive
+                        ? { duration: 5, repeat: Infinity, ease: 'easeInOut' }
+                        : { duration: 0.4 }
+                    }
+                    className={`pointer-events-none h-auto select-none
+                                w-[300px] sm:w-[360px] md:w-[440px] lg:w-[480px]
+                                transition-[filter] duration-500 ${
+                      isActive && isLocked ? 'blur-[10px]' : ''
+                    }`}
+                    style={{
+                      filter:
+                        isActive && isLocked
+                          ? 'drop-shadow(0 36px 55px rgba(120,60,0,0.2)) saturate(0.7)'
+                          : 'drop-shadow(0 36px 55px rgba(120,60,0,0.4))',
+                    }}
+                  />
+
+                  {/* ─── Матовое стеклянное покрытие ─── */}
+                  {isActive && isLocked && (
+                    <>
+                      {/* Мягкая матовая пелена */}
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0
+                                   rounded-[24px]
+                                   bg-white/25
+                                   backdrop-blur-[2px]
+                                   transition-opacity duration-500"
+                      />
+
+                      {/* Лёгкий градиент — эффект стекла */}
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0
+                                   rounded-[24px]
+                                   bg-[linear-gradient(135deg,rgba(255,255,255,0.35)_0%,transparent_35%,transparent_65%,rgba(255,255,255,0.2)_100%)]"
+                      />
+
+                      {/* Тонкая светлая рамка стекла */}
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-[3px]
+                                   rounded-[22px]
+                                   ring-1 ring-white/50
+                                   shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+                      />
+
+                      {/* Бейдж «Скоро» по центру коробки */}
+                      <div
+                        className="absolute inset-0 flex items-center justify-center
+                                   z-20 pointer-events-none"
+                      >
+                        <span
+                          className="inline-flex items-center gap-2
+                                     px-4 py-2 rounded-full
+                                     bg-white/85 backdrop-blur-md
+                                     border border-white/70
+                                     shadow-[0_10px_28px_-10px_rgba(120,60,0,0.4)]
+                                     text-[10px] font-black uppercase
+                                     tracking-[0.28em] text-zinc-600"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                          Скоро
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </motion.div>
             );
           })}

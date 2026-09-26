@@ -6,7 +6,6 @@ import { useCollections } from '@/hooks/useCollections';
 
 const EASE = [0.22, 1, 0.36, 1];
 
-/* ─── Плюрализация ─── */
 function plural(n, forms) {
   const a = Math.abs(n) % 100;
   const b = a % 10;
@@ -38,30 +37,20 @@ function ProgressRing({ value, isComplete, size = 44 }) {
             <stop offset="100%" stopColor={to} />
           </linearGradient>
         </defs>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke="#EFE1CC"
-          strokeWidth={stroke}
-        />
+        <circle cx={size / 2} cy={size / 2} r={r}
+          fill="none" stroke="#EFE1CC" strokeWidth={stroke} />
         <motion.circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={`url(#${gradId})`}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={c}
+          cx={size / 2} cy={size / 2} r={r}
+          fill="none" stroke={`url(#${gradId})`}
+          strokeWidth={stroke} strokeLinecap="round" strokeDasharray={c}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: offset }}
           transition={{ duration: 1.1, delay: 0.3, ease: EASE }}
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="font-heading text-[11px] font-black tabular-nums text-[#1A1A22] leading-none">
+        <span className="font-heading text-[11px] font-black tabular-nums
+                         text-[#1A1A22] leading-none">
           {Math.round(safe)}
           <span className="text-[7px] text-zinc-400 align-super">%</span>
         </span>
@@ -80,6 +69,7 @@ function CollectionCard({ collection, index }) {
     cover,
     progress = 0,
     isComplete,
+    isLocked,   // ← из useCollections
   } = collection;
 
   const displayImage =
@@ -93,50 +83,75 @@ function CollectionCard({ collection, index }) {
       className="relative"
     >
       <Link
-        to={`/collection/${id}`}
-        className="group relative block focus:outline-none"
+        to={isLocked ? undefined : `/collection/${id}`}
+        onClick={(e) => isLocked && e.preventDefault()}
+        className={`group relative block focus:outline-none ${
+          isLocked ? 'cursor-not-allowed' : ''
+        }`}
       >
         <div className="relative flex items-center justify-center
                         aspect-[4/5] sm:aspect-[1/1] md:aspect-[5/4]">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 flex items-center justify-center"
-          >
+
+          {/* Свечение — приглушённое если locked */}
+          <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div
-              className={`w-[95%] aspect-square rounded-full blur-[60px] transition-all duration-700
-                          ${
-                            isComplete
-                              ? 'bg-[radial-gradient(circle,rgba(255,210,76,0.5),transparent_70%)] opacity-85'
-                              : 'bg-[radial-gradient(circle,rgba(255,150,0,0.4),transparent_70%)] opacity-65'
-                          }
-                          group-hover:opacity-100 group-hover:scale-110`}
+              className={`w-[95%] aspect-square rounded-full blur-[60px] transition-all duration-700 ${
+                isLocked
+                  ? 'bg-[radial-gradient(circle,rgba(180,140,90,0.25),transparent_70%)] opacity-40'
+                  : isComplete
+                    ? 'bg-[radial-gradient(circle,rgba(255,210,76,0.5),transparent_70%)] opacity-85 group-hover:opacity-100 group-hover:scale-110'
+                    : 'bg-[radial-gradient(circle,rgba(255,150,0,0.4),transparent_70%)] opacity-65 group-hover:opacity-100 group-hover:scale-110'
+              }`}
             />
           </div>
 
-          <div className="absolute top-1 right-1 z-20">
-            <ProgressRing value={progress} isComplete={isComplete} size={42} />
-          </div>
+          {/* Прогресс — только если не locked */}
+          {!isLocked && (
+            <div className="absolute top-1 right-1 z-20">
+              <ProgressRing value={progress} isComplete={isComplete} size={42} />
+            </div>
+          )}
 
+          {/* Бейдж «Скоро» */}
+          {isLocked && (
+            <span className="absolute top-1 right-1 z-30
+                             inline-flex items-center gap-1.5
+                             px-2.5 py-1 rounded-full
+                             bg-white/90 backdrop-blur-sm
+                             border border-[#F0E4D2]
+                             text-[9px] font-black uppercase tracking-[0.22em] text-zinc-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+              Скоро
+            </span>
+          )}
+
+          {/* Коробка — заблюрена если locked */}
           <motion.img
             src={displayImage}
             alt={name}
-            className="relative z-10 w-full
+            className={`relative z-10 w-full
                        max-w-[280px] sm:max-w-[320px] md:max-w-[360px]
                        h-auto object-contain select-none
-                       drop-shadow-[0_32px_44px_rgba(120,60,0,0.4)]
                        transition-all duration-500 ease-out
-                       group-hover:-translate-y-2 group-hover:scale-[1.04]
-                       group-hover:drop-shadow-[0_40px_58px_rgba(120,60,0,0.5)]"
+                       ${
+                         isLocked
+                           ? 'blur-[8px] opacity-60'
+                           : 'drop-shadow-[0_32px_44px_rgba(120,60,0,0.4)] group-hover:-translate-y-2 group-hover:scale-[1.04] group-hover:drop-shadow-[0_40px_58px_rgba(120,60,0,0.5)]'
+                       }`}
             draggable={false}
           />
         </div>
 
         <h3
-          className="mt-3 text-center font-heading font-black
+          className={`mt-3 text-center font-heading font-black
                      text-[14px] sm:text-[15px] md:text-[16px]
-                     leading-[1.15] tracking-[-0.02em] text-[#1A1A22]
-                     transition-colors duration-300 group-hover:text-[#B87400]
-                     line-clamp-2 min-h-[2.3em]"
+                     leading-[1.15] tracking-[-0.02em]
+                     line-clamp-2 min-h-[2.3em] transition-colors duration-300
+                     ${
+                       isLocked
+                         ? 'text-zinc-400'
+                         : 'text-[#1A1A22] group-hover:text-[#B87400]'
+                     }`}
         >
           {name}
         </h3>
@@ -168,12 +183,10 @@ function EmptyState() {
       <p className="mt-3 text-sm text-zinc-500">
         Скоро здесь появятся новые серии
       </p>
-      <Link
-        to="/"
+      <Link to="/"
         className="mt-8 inline-flex items-center gap-2 px-6 py-3 rounded-2xl
                    bg-[#1A1A22] text-white
-                   font-heading text-[11px] font-black uppercase tracking-[0.22em]"
-      >
+                   font-heading text-[11px] font-black uppercase tracking-[0.22em]">
         На главную
       </Link>
     </div>
@@ -189,50 +202,39 @@ export default function CollectionsList() {
   return (
     <div className="relative min-h-screen bg-[#FFF6EA] text-[#1A1A22]">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="absolute left-1/2 top-[20%] h-[900px] w-[900px]
-                     -translate-x-1/2 rounded-full
-                     bg-[radial-gradient(circle,rgba(255,180,0,0.15)_0%,transparent_65%)]
-                     blur-3xl"
-        />
-        <div
-          className="absolute inset-x-0 top-0 h-40
-                     bg-[linear-gradient(180deg,#FFF9F0,transparent)]"
-        />
+        <div className="absolute left-1/2 top-[20%] h-[900px] w-[900px]
+                        -translate-x-1/2 rounded-full
+                        bg-[radial-gradient(circle,rgba(255,180,0,0.15)_0%,transparent_65%)]
+                        blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-40
+                        bg-[linear-gradient(180deg,#FFF9F0,transparent)]" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-8 md:py-12">
-
-        {/* ─── Навигация назад ─── */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: EASE }}
           className="mb-6"
         >
-          <Link
-            to="/"
+          <Link to="/"
             className="group inline-flex items-center gap-2
                        text-[10px] uppercase tracking-[0.28em] font-bold
-                       text-zinc-500 hover:text-[#1A1A22] transition-colors"
-          >
+                       text-zinc-500 hover:text-[#1A1A22] transition-colors">
             <span className="text-base transition-transform group-hover:-translate-x-1">←</span>
             На главную
           </Link>
         </motion.div>
 
-        {/* ─── Заголовок + счётчик (просто текст) ─── */}
         <motion.header
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: EASE }}
           className="flex items-end justify-between gap-4 mb-8 sm:mb-10"
         >
-          <h1
-            className="font-heading font-black
-                       text-[28px] sm:text-[36px] md:text-[42px]
-                       tracking-[-0.04em] leading-[0.95] text-[#1A1A22]"
-          >
+          <h1 className="font-heading font-black
+                         text-[28px] sm:text-[36px] md:text-[42px]
+                         tracking-[-0.04em] leading-[0.95] text-[#1A1A22]">
             Все коллекции
           </h1>
 
@@ -250,7 +252,6 @@ export default function CollectionsList() {
           )}
         </motion.header>
 
-        {/* ─── Ошибка ─── */}
         {error && (
           <div className="mt-12 text-center text-red-500 text-sm">
             Ошибка загрузки: {error}
@@ -259,20 +260,14 @@ export default function CollectionsList() {
 
         {!error && collections.length === 0 && <EmptyState />}
 
-        {/* ─── Сетка ─── */}
         {!error && collections.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
             {collections.map((collection, i) => (
-              <CollectionCard
-                key={collection.id}
-                collection={collection}
-                index={i}
-              />
+              <CollectionCard key={collection.id} collection={collection} index={i} />
             ))}
           </div>
         )}
 
-        {/* ─── Штамп Pop Mart — просто текст ─── */}
         <div className="mt-14 flex justify-center">
           <div className="inline-flex items-center gap-3">
             <span className="w-1.5 h-1.5 rounded-full bg-[#E60012]" />

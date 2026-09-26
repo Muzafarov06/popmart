@@ -28,24 +28,20 @@ function ProgressRing({ value, isComplete }) {
             <stop offset="100%" stopColor={to} />
           </linearGradient>
         </defs>
-        <circle
-          cx={size / 2} cy={size / 2} r={r}
-          fill="none" stroke="#F5E7CF" strokeWidth={stroke}
-        />
+        <circle cx={size / 2} cy={size / 2} r={r}
+          fill="none" stroke="#F5E7CF" strokeWidth={stroke} />
         <motion.circle
           cx={size / 2} cy={size / 2} r={r}
-          fill="none"
-          stroke={`url(#${gradId})`}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={c}
+          fill="none" stroke={`url(#${gradId})`}
+          strokeWidth={stroke} strokeLinecap="round" strokeDasharray={c}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: offset }}
           transition={{ duration: 1.1, delay: 0.3, ease: EASE }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-heading text-[26px] font-black tabular-nums text-[#1A1A22] leading-none">
+        <span className="font-heading text-[26px] font-black tabular-nums
+                         text-[#1A1A22] leading-none">
           {Math.round(safe)}
           <span className="text-[14px] text-zinc-400 align-super">%</span>
         </span>
@@ -54,7 +50,7 @@ function ProgressRing({ value, isComplete }) {
   );
 }
 
-/* ─── Мини-аватар фигурки — без круглой рамки, бейдж поверх ─── */
+/* ─── Мини-аватар фигурки ─── */
 function FigureAvatar({ figure, owned, index }) {
   const isOwned = owned > 0;
   const isSecret = figure.is_secret;
@@ -69,22 +65,14 @@ function FigureAvatar({ figure, owned, index }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.04, ease: EASE }}
       className={`relative w-12 h-12 rounded-full overflow-visible shrink-0
-                  ${
-                    isOwned
-                      ? 'bg-[#FFF1DC]'
-                      : 'bg-[#FAF3E6]'
-                  }`}
+                  ${isOwned ? 'bg-[#FFF1DC]' : 'bg-[#FAF3E6]'}`}
     >
-      {/* Изображение — обрезано кругом */}
       <div className="absolute inset-0 rounded-full overflow-hidden">
-        <img
-          src={src}
-          alt=""
+        <img src={src} alt=""
           className={`w-full h-full object-cover ${
             isOwned ? '' : 'grayscale opacity-40'
           }`}
-          draggable={false}
-        />
+          draggable={false} />
         {showSilhouette && (
           <span className="absolute inset-0 flex items-center justify-center
                            bg-black/20 backdrop-blur-[1px]">
@@ -94,12 +82,9 @@ function FigureAvatar({ figure, owned, index }) {
           </span>
         )}
       </div>
-
-      {/* Бейдж с количеством — крупный, поверх, справа-сверху */}
       {owned > 1 && (
         <motion.span
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
+          initial={{ scale: 0 }} animate={{ scale: 1 }}
           transition={{ duration: 0.3, delay: 0.2, ease: EASE }}
           className="absolute -top-1.5 -right-1.5 z-10
                      min-w-[22px] h-[22px] px-1.5
@@ -116,7 +101,7 @@ function FigureAvatar({ figure, owned, index }) {
   );
 }
 
-/* ─── Сегментированный прогресс ─── */
+/* ─── Сегментный прогресс ─── */
 function SegmentProgress({ figures, owned }) {
   return (
     <div className="flex items-center gap-[3px]">
@@ -124,7 +109,6 @@ function SegmentProgress({ figures, owned }) {
         const count = owned[f.id] || 0;
         const isOwned = count > 0;
         const isSecret = f.is_secret;
-
         return (
           <motion.div
             key={f.id}
@@ -136,9 +120,7 @@ function SegmentProgress({ figures, owned }) {
                 ? isSecret
                   ? 'bg-[linear-gradient(90deg,#FFD24C,#FF9500)] shadow-[0_0_10px_rgba(255,180,60,0.7)]'
                   : 'bg-[linear-gradient(90deg,#FFB800,#FF6B00)]'
-                : isSecret
-                  ? 'bg-[#F5E5C8]'
-                  : 'bg-[#EFE0CC]'
+                : isSecret ? 'bg-[#F5E5C8]' : 'bg-[#EFE0CC]'
             }`}
             title={isSecret && !isOwned ? '???' : f.name}
           />
@@ -159,11 +141,11 @@ export default function CollectionPanel({ collection, onOpen }) {
     totalCount,
     progress,
     isComplete,
-    is_active,
     hasSecret,
+    canPlay,     // ← из buildCollection
+    isLocked,    // ← из buildCollection
   } = collection;
 
-  const canOpen = is_active;
   const previewFigures = figures.slice(0, 6);
   const restCount = Math.max(0, figures.length - previewFigures.length);
   const secretCount = figures.filter((f) => f.is_secret).length;
@@ -181,29 +163,38 @@ export default function CollectionPanel({ collection, onOpen }) {
                       p-6 sm:p-8
                       shadow-[0_30px_60px_-30px_rgba(180,110,0,0.4)]">
 
-        {/* ─── СТАТУС ─── */}
+        {/* ─── СТАТУС / «СКОРО» ─── */}
         <div className="flex items-center justify-between gap-3">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={isComplete ? 'done' : 'progress'}
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
-              transition={{ duration: 0.25, ease: EASE }}
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5
-                          text-[10px] font-black uppercase tracking-[0.2em]
-                          ${
-                            isComplete
-                              ? 'bg-[#E7F7EC] text-[#1E7A44]'
-                              : 'bg-[#FFF1DC] text-[#9A6A00]'
-                          }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                isComplete ? 'bg-[#1E7A44]' : 'bg-[#FF9500] animate-pulse'
-              }`} />
-              {isComplete ? 'Собрано' : 'В процессе'}
-            </motion.span>
-          </AnimatePresence>
+          {isLocked ? (
+            <span className="inline-flex items-center gap-2 rounded-full px-3 py-1.5
+                             text-[10px] font-black uppercase tracking-[0.2em]
+                             bg-[#E8E4DC] text-zinc-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+              Скоро
+            </span>
+          ) : (
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={isComplete ? 'done' : 'progress'}
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.25, ease: EASE }}
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5
+                            text-[10px] font-black uppercase tracking-[0.2em]
+                            ${
+                              isComplete
+                                ? 'bg-[#E7F7EC] text-[#1E7A44]'
+                                : 'bg-[#FFF1DC] text-[#9A6A00]'
+                            }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  isComplete ? 'bg-[#1E7A44]' : 'bg-[#FF9500] animate-pulse'
+                }`} />
+                {isComplete ? 'Собрано' : 'В процессе'}
+              </motion.span>
+            </AnimatePresence>
+          )}
 
           <span className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-400">
             Коллекция
@@ -222,7 +213,8 @@ export default function CollectionPanel({ collection, onOpen }) {
             </p>
           </div>
 
-          <ProgressRing value={progress} isComplete={isComplete} />
+          {/* Круг прогресса — только если не заблокировано */}
+          {!isLocked && <ProgressRing value={progress} isComplete={isComplete} />}
         </div>
 
         {/* ─── ПРОГРЕСС-БАР ─── */}
@@ -243,26 +235,26 @@ export default function CollectionPanel({ collection, onOpen }) {
           </div>
         </div>
 
-        {/* ─── ФИГУРКИ ─── */}
+        {/* ─── ФИГУРКИ (заблюрены если locked) ─── */}
         <div className="mt-6 pt-6 border-t border-[#F5EBD8]">
           <div className="flex items-center justify-between mb-4">
             <span className="text-[10px] font-black uppercase tracking-[0.28em] text-zinc-400">
               Фигурки
             </span>
-            {hasSecret && (
+            {hasSecret && !isLocked && (
               <span className="inline-flex items-center gap-1.5
                                text-[10px] font-black uppercase tracking-[0.22em] text-[#B87400]">
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 shrink-0">
                   <path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 5a3 3 0 1 1 6 0v3H9V6zm3 9a1.5 1.5 0 0 1 1.5 1.5c0 .6-.35 1.12-.87 1.36V19a.63.63 0 1 1-1.26 0v-1.14A1.5 1.5 0 0 1 12 15z" />
                 </svg>
-                <span>
-                  секретных: <span className="tabular-nums">{secretOwned}/{secretCount}</span>
-                </span>
+                <span>секретных: <span className="tabular-nums">{secretOwned}/{secretCount}</span></span>
               </span>
             )}
           </div>
 
-          <div className="flex items-center -space-x-2">
+          <div className={`flex items-center -space-x-2 transition-all ${
+            isLocked ? 'blur-[6px] opacity-60 pointer-events-none select-none' : ''
+          }`}>
             {previewFigures.map((f, i) => (
               <FigureAvatar key={f.id} figure={f} owned={owned[f.id] || 0} index={i} />
             ))}
@@ -277,36 +269,43 @@ export default function CollectionPanel({ collection, onOpen }) {
           </div>
         </div>
 
-        {/* ─── КНОПКА «ОТКРЫТЬ» — без иконки, hover оранжевый ─── */}
+        {/* ─── КНОПКА «ОТКРЫТЬ» ─── */}
         <button
           type="button"
-          onClick={onOpen}
-          disabled={!canOpen}
-          className="w-full mt-6 py-5 rounded-2xl
-                     bg-[#1A1A22]
-                     text-white
+          onClick={canPlay ? onOpen : undefined}
+          disabled={!canPlay}
+          className={`w-full mt-6 py-5 rounded-2xl
                      font-heading text-[13px] font-black uppercase tracking-[0.24em]
-                     shadow-[0_16px_32px_-14px_rgba(26,26,34,0.55)]
-                     hover:bg-[#FF9500]
-                     hover:shadow-[0_20px_40px_-14px_rgba(255,140,0,0.7)]
-                     hover:-translate-y-0.5 active:translate-y-0
-                     disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none
-                     transition-all duration-200"
+                     transition-all duration-200
+                     ${
+                       canPlay
+                         ? 'bg-[#1A1A22] text-white shadow-[0_16px_32px_-14px_rgba(26,26,34,0.55)] hover:bg-[#FF9500] hover:shadow-[0_20px_40px_-14px_rgba(255,140,0,0.7)] hover:-translate-y-0.5 active:translate-y-0'
+                         : 'bg-[#E8E4DC] text-zinc-400 cursor-not-allowed'
+                     }`}
         >
-          {canOpen ? 'Открыть коробку' : 'Скоро'}
+          {canPlay ? 'Открыть коробку' : 'Скоро'}
         </button>
 
         {/* ─── ССЫЛКА «В КОЛЛЕКЦИЮ» ─── */}
         <div className="mt-4 flex justify-center">
-          <Link
-            to={`/collection/${id}`}
-            className="inline-flex items-center gap-1.5
-                       text-[11px] uppercase tracking-[0.28em] font-medium
-                       text-zinc-400 hover:text-[#B87400] transition-colors"
-          >
-            В коллекцию
-            <span className="text-[13px] leading-none">→</span>
-          </Link>
+          {canPlay ? (
+            <Link
+              to={`/collection/${id}`}
+              className="inline-flex items-center gap-1.5
+                         text-[11px] uppercase tracking-[0.28em] font-medium
+                         text-zinc-400 hover:text-[#B87400] transition-colors"
+            >
+              В коллекцию
+              <span className="text-[13px] leading-none">→</span>
+            </Link>
+          ) : (
+            <span className="inline-flex items-center gap-1.5
+                             text-[11px] uppercase tracking-[0.28em] font-medium
+                             text-zinc-300 cursor-not-allowed select-none">
+              В коллекцию
+              <span className="text-[13px] leading-none">→</span>
+            </span>
+          )}
         </div>
       </div>
     </motion.div>

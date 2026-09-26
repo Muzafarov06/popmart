@@ -25,13 +25,16 @@ function groupOwnedByCollection(rows) {
   return map;
 }
 
-function buildCollection(raw, ownedMap) {
+function buildCollection(raw, ownedMap, user) {
   const figures = [...(raw.figures || [])].sort(
     (a, b) => a.sort_order - b.sort_order
   );
   const owned = ownedMap[raw.id] || {};
   const ownedCount = Object.keys(owned).length;
   const totalCount = figures.length;
+
+  const isAdmin = user?.role === 'admin';
+  const canPlay = raw.is_active && (raw.is_published || isAdmin);
 
   return {
     ...raw,
@@ -42,6 +45,10 @@ function buildCollection(raw, ownedMap) {
     progress: totalCount ? (ownedCount / totalCount) * 100 : 0,
     hasSecret: figures.some((f) => f.is_secret),
     isComplete: totalCount > 0 && ownedCount === totalCount,
+
+    // 🔒 Флаги доступности
+    canPlay,             // true — можно играть (открывать, входить)
+    isLocked: !canPlay,  // true — показываем блюр/«Скоро»
   };
 }
 
@@ -75,7 +82,7 @@ export function useCollections() {
           .from('collections')
           .select(`
             id, name, description, cover, hero_cover, display_cover,
-            is_active, sort_order,
+            is_active, is_published, sort_order,
             figures:figures(
               id, name, rarity, weight, points,
               image, card, silhouette, is_secret, sort_order
@@ -91,7 +98,9 @@ export function useCollections() {
       if (controller.signal.aborted) return;
 
       const ownedMap = groupOwnedByCollection(ufRes.data);
-      const result = (colsRes.data || []).map((c) => buildCollection(c, ownedMap));
+      const result = (colsRes.data || []).map((c) =>
+        buildCollection(c, ownedMap, user)
+      );
 
       setCollections(result);
       writeCache(userId, result);
@@ -120,7 +129,6 @@ export function useCollections() {
     return () => abortRef.current?.abort();
   }, [load, userId]);
 
-  // ⚠️ Без сброса кэша — только фоновое обновление
   const refresh = useCallback(() => {
     load(true);
   }, [load]);
