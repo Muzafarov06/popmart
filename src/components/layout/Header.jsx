@@ -1,5 +1,5 @@
 // src/components/layout/Header.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
@@ -118,6 +118,31 @@ function formatLastSeen(iso, isOnline) {
   return `${dd}.${mm}.${yyyy}`;
 }
 
+/* ═══════════════════ ХУК: закрытие по клику снаружи ═══════════════════ */
+
+function useClickOutside(refs, enabled, onClose) {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const handler = (e) => {
+      const target = e.target;
+      const inside = refs.some((r) => r.current && r.current.contains(target));
+      if (!inside) onClose();
+    };
+
+    document.addEventListener('pointerdown', handler);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') onClose();
+    });
+
+    return () => {
+      document.removeEventListener('pointerdown', handler);
+      document.removeEventListener('keydown', handler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled]);
+}
+
 /* ═══════════════════ АВАТАР ═══════════════════ */
 
 function UserAvatar({ user, myLogin, size = 'md' }) {
@@ -149,6 +174,10 @@ const MAX_VISIBLE = 3;
 
 function OnlineStack({ users, myLogin, lastSeen = {} }) {
   const [expanded, setExpanded] = useState(false);
+  const btnRef = useRef(null);
+  const dropRef = useRef(null);
+
+  useClickOutside([btnRef, dropRef], expanded, () => setExpanded(false));
 
   const total = users.length;
   const hasOverflow = total > MAX_VISIBLE;
@@ -158,6 +187,7 @@ function OnlineStack({ users, myLogin, lastSeen = {} }) {
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setExpanded((v) => !v)}
         title="Показать игроков"
@@ -187,69 +217,67 @@ function OnlineStack({ users, myLogin, lastSeen = {} }) {
 
       <AnimatePresence>
         {expanded && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setExpanded(false)} />
-            <motion.div
-              initial={{ opacity: 0, y: -6, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.96 }}
-              transition={{ duration: 0.18, ease: EASE }}
-              className="absolute right-0 top-[calc(100%+10px)] z-50 w-72 p-2 rounded-2xl
-                         bg-white border border-[#F0E4D2]
-                         shadow-[0_24px_56px_-24px_rgba(120,60,0,0.4)]
-                         overflow-hidden"
-            >
-              <div className="px-2 py-2 flex items-center justify-between">
-                <span className="text-[9px] uppercase tracking-[0.28em]
-                                 font-black text-zinc-400">
-                  Игроки
-                </span>
-                <span className="text-[9px] uppercase tracking-[0.24em]
-                                 font-black text-[#1E7A44]">
-                  {users.filter((u) => u.isOnline).length} онлайн
-                </span>
-              </div>
+          <motion.div
+            ref={dropRef}
+            initial={{ opacity: 0, y: -6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+            transition={{ duration: 0.18, ease: EASE }}
+            className="absolute right-0 top-[calc(100%+10px)] z-50 w-72 p-2 rounded-2xl
+                       bg-white border border-[#F0E4D2]
+                       shadow-[0_24px_56px_-24px_rgba(120,60,0,0.4)]
+                       overflow-hidden"
+          >
+            <div className="px-2 py-2 flex items-center justify-between">
+              <span className="text-[9px] uppercase tracking-[0.28em]
+                               font-black text-zinc-400">
+                Игроки
+              </span>
+              <span className="text-[9px] uppercase tracking-[0.24em]
+                               font-black text-[#1E7A44]">
+                {users.filter((u) => u.isOnline).length} онлайн
+              </span>
+            </div>
 
-              <div className="mt-1 space-y-0.5 max-h-[300px] overflow-y-auto
-                              [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {users.map((u) => {
-                  const lastLabel = formatLastSeen(lastSeen[u.login], u.isOnline);
-                  return (
-                    <Link
-                      key={u.login}
-                      to={`/profile/${u.login}`}
-                      onClick={() => setExpanded(false)}
-                      className="flex items-center gap-3 px-2 py-2 rounded-xl
-                                 hover:bg-[#FFF9F0] transition-colors"
-                    >
-                      <UserAvatar user={u} myLogin={myLogin} />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-heading font-black text-[13px]
-                                        text-[#1A1A22] truncate">
-                          {u.name}
-                          {u.login === myLogin && (
-                            <span className="ml-1.5 text-[9px] uppercase
-                                             tracking-[0.2em] font-black text-[#B87400]">
-                              · ты
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] font-mono text-zinc-400 truncate">
-                          @{u.login}
-                        </div>
+            <div className="mt-1 space-y-0.5 max-h-[300px] overflow-y-auto
+                            [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {users.map((u) => {
+                const lastLabel = formatLastSeen(lastSeen[u.login], u.isOnline);
+                return (
+                  <Link
+                    key={u.login}
+                    to={`/profile/${u.login}`}
+                    onClick={() => setExpanded(false)}
+                    className="flex items-center gap-3 px-2 py-2 rounded-xl
+                               hover:bg-[#FFF9F0] transition-colors"
+                  >
+                    <UserAvatar user={u} myLogin={myLogin} />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-heading font-black text-[13px]
+                                      text-[#1A1A22] truncate">
+                        {u.name}
+                        {u.login === myLogin && (
+                          <span className="ml-1.5 text-[9px] uppercase
+                                           tracking-[0.2em] font-black text-[#B87400]">
+                            · ты
+                          </span>
+                        )}
                       </div>
-                      <span className={`text-[10px] font-black uppercase
-                                        tracking-[0.16em] shrink-0 ${
-                        u.isOnline ? 'text-[#1E7A44]' : 'text-zinc-400'
-                      }`}>
-                        {lastLabel}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </>
+                      <div className="text-[10px] font-mono text-zinc-400 truncate">
+                        @{u.login}
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-black uppercase
+                                      tracking-[0.16em] shrink-0 ${
+                      u.isOnline ? 'text-[#1E7A44]' : 'text-zinc-400'
+                    }`}>
+                      {lastLabel}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
@@ -260,6 +288,10 @@ function OnlineStack({ users, myLogin, lastSeen = {} }) {
 
 function MobileOnlineStack({ users, myLogin, lastSeen = {} }) {
   const [expanded, setExpanded] = useState(false);
+  const btnRef = useRef(null);
+  const dropRef = useRef(null);
+
+  useClickOutside([btnRef, dropRef], expanded, () => setExpanded(false));
 
   if (users.length === 0) return null;
 
@@ -271,8 +303,9 @@ function MobileOnlineStack({ users, myLogin, lastSeen = {} }) {
   return (
     <>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setExpanded(true)}
+        onClick={() => setExpanded((v) => !v)}
         aria-label="Кто онлайн"
         className="relative flex items-center gap-1.5 active:opacity-80
                    transition-opacity"
@@ -281,7 +314,6 @@ function MobileOnlineStack({ users, myLogin, lastSeen = {} }) {
           {visible.map((u, i) => {
             const isMe = u.login === myLogin;
             const isLast = i === visible.length - 1 && rest === 0;
-            // Белая подложка — только вокруг последней (единорога)
             const withBackdrop = isLast;
 
             return (
@@ -336,10 +368,10 @@ function MobileOnlineStack({ users, myLogin, lastSeen = {} }) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              onClick={() => setExpanded(false)}
               className="fixed inset-0 z-[80] bg-[#1A1A22]/40 backdrop-blur-sm md:hidden"
             />
             <motion.div
+              ref={dropRef}
               initial={{ opacity: 0, y: 20, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.96 }}
@@ -414,9 +446,12 @@ export default function Header() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const userMenuRef = useRef(null);
 
   const { online, allowed, lastSeen } = useOnlineUsers();
   const { activeCollectionId, newEventsCount, markAsRead } = useHeaderData();
+
+  useClickOutside([userMenuRef], open, () => setOpen(false));
 
   const meta = findUserByLogin(user?.login);
   const emoji = meta?.emoji || '🐾';
@@ -431,7 +466,6 @@ export default function Header() {
     if (pathname === '/leaderboard') markAsRead();
   }, [pathname, markAsRead]);
 
-  const showBoxButton = activeCollectionId && !pathname.startsWith('/unbox');
   const handleOpenBox = () => {
     if (activeCollectionId) navigate(`/unbox/${activeCollectionId}`);
   };
@@ -444,7 +478,7 @@ export default function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 h-16
                         flex items-center gap-3">
 
-          {/* ─── Лого: красный квадрат POP MART ─── */}
+          {/* ─── Лого ─── */}
           <Link to="/" className="group shrink-0">
             <span
               className="inline-flex items-center px-2.5 py-1.5 rounded-md
@@ -492,10 +526,8 @@ export default function Header() {
               </div>
             )}
 
-            
-
             {/* Юзер */}
-            <div className="relative shrink-0">
+            <div ref={userMenuRef} className="relative shrink-0">
               <button
                 onClick={() => setOpen((v) => !v)}
                 className={`flex items-center gap-2 pl-1 pr-3 py-1 rounded-full
@@ -531,94 +563,91 @@ export default function Header() {
 
               <AnimatePresence>
                 {open && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                      transition={{ duration: 0.18, ease: EASE }}
-                      className="absolute right-0 top-[calc(100%+10px)] z-50 w-64 p-1.5
-                                 rounded-2xl bg-white border border-[#F0E4D2]
-                                 shadow-[0_24px_56px_-24px_rgba(120,60,0,0.4)]
-                                 overflow-hidden"
-                    >
-                      <div className="relative px-3.5 py-3.5 border-b border-[#F5EBD8]">
-                        <span
-                          aria-hidden
-                          className="pointer-events-none absolute -top-12 -right-12
-                                     w-32 h-32 rounded-full blur-3xl opacity-25"
-                          style={{ background: userColor }}
-                        />
-                        <div className="relative flex items-center gap-3">
-                          <span className="relative shrink-0">
-                            <span
-                              aria-hidden
-                              className="absolute inset-0 rounded-full blur-[10px] opacity-55"
-                              style={{ background: userColor }}
-                            />
-                            <span
-                              className="relative w-12 h-12 rounded-full
-                                         flex items-center justify-center text-[22px]
-                                         ring-2 ring-white
-                                         shadow-[0_6px_14px_-6px_rgba(0,0,0,0.3)]"
-                              style={{ background: `${userColor}2E` }}
-                            >
-                              {emoji}
-                            </span>
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                    transition={{ duration: 0.18, ease: EASE }}
+                    className="absolute right-0 top-[calc(100%+10px)] z-50 w-64 p-1.5
+                               rounded-2xl bg-white border border-[#F0E4D2]
+                               shadow-[0_24px_56px_-24px_rgba(120,60,0,0.4)]
+                               overflow-hidden"
+                  >
+                    <div className="relative px-3.5 py-3.5 border-b border-[#F5EBD8]">
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute -top-12 -right-12
+                                   w-32 h-32 rounded-full blur-3xl opacity-25"
+                        style={{ background: userColor }}
+                      />
+                      <div className="relative flex items-center gap-3">
+                        <span className="relative shrink-0">
+                          <span
+                            aria-hidden
+                            className="absolute inset-0 rounded-full blur-[10px] opacity-55"
+                            style={{ background: userColor }}
+                          />
+                          <span
+                            className="relative w-12 h-12 rounded-full
+                                       flex items-center justify-center text-[22px]
+                                       ring-2 ring-white
+                                       shadow-[0_6px_14px_-6px_rgba(0,0,0,0.3)]"
+                            style={{ background: `${userColor}2E` }}
+                          >
+                            {emoji}
                           </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <p className="font-heading font-black text-[14px]
-                                            text-[#1A1A22] truncate">
-                                {user?.name}
-                              </p>
-                              {isAdmin && (
-                                <span className="text-[8px] uppercase
-                                                 tracking-[0.22em] font-black
-                                                 px-1.5 py-0.5 rounded-md
-                                                 text-[#B87400] bg-[#FFB800]/15">
-                                  admin
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-zinc-400 font-mono truncate">
-                              @{user?.login}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-heading font-black text-[14px]
+                                          text-[#1A1A22] truncate">
+                              {user?.name}
                             </p>
+                            {isAdmin && (
+                              <span className="text-[8px] uppercase
+                                               tracking-[0.22em] font-black
+                                               px-1.5 py-0.5 rounded-md
+                                               text-[#B87400] bg-[#FFB800]/15">
+                                admin
+                              </span>
+                            )}
                           </div>
+                          <p className="text-[11px] text-zinc-400 font-mono truncate">
+                            @{user?.login}
+                          </p>
                         </div>
                       </div>
+                    </div>
 
-                      <Link
-                        to={`/profile/${user?.login}`}
-                        onClick={() => setOpen(false)}
-                        className="w-full mt-1 px-3 py-2.5 rounded-xl flex
-                                   items-center gap-2.5 text-[12px] font-semibold
-                                   uppercase tracking-[0.16em] text-[#1A1A22]
-                                   hover:bg-[#FFF9F0] transition-colors"
-                      >
-                        <UserIcon className="w-4 h-4 text-zinc-500" />
-                        Профиль
-                      </Link>
+                    <Link
+                      to={`/profile/${user?.login}`}
+                      onClick={() => setOpen(false)}
+                      className="w-full mt-1 px-3 py-2.5 rounded-xl flex
+                                 items-center gap-2.5 text-[12px] font-semibold
+                                 uppercase tracking-[0.16em] text-[#1A1A22]
+                                 hover:bg-[#FFF9F0] transition-colors"
+                    >
+                      <UserIcon className="w-4 h-4 text-zinc-500" />
+                      Профиль
+                    </Link>
 
-                      <button
-                        onClick={async () => { setOpen(false); await logout(); }}
-                        className="w-full px-3 py-2.5 rounded-xl flex items-center
-                                   gap-2.5 text-[12px] font-semibold uppercase
-                                   tracking-[0.16em] text-[#B87400]
-                                   hover:bg-[#FFF4E0] transition-colors"
-                      >
-                        <LogoutIcon className="w-4 h-4" />
-                        Выйти
-                      </button>
-                    </motion.div>
-                  </>
+                    <button
+                      onClick={async () => { setOpen(false); await logout(); }}
+                      className="w-full px-3 py-2.5 rounded-xl flex items-center
+                                 gap-2.5 text-[12px] font-semibold uppercase
+                                 tracking-[0.16em] text-[#B87400]
+                                 hover:bg-[#FFF4E0] transition-colors"
+                    >
+                      <LogoutIcon className="w-4 h-4" />
+                      Выйти
+                    </button>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </div>
           </div>
 
-          {/* Мобилка: только онлайн-стек, без колокольчика */}
+          {/* Мобилка: только онлайн-стек */}
           <div className="flex md:hidden items-center ml-auto">
             <MobileOnlineStack
               users={visibleUsers}

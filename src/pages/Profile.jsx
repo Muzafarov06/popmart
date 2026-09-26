@@ -1,9 +1,10 @@
 // src/pages/Profile.jsx
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useProfile } from '@/hooks/useProfile';
 import { useCollections } from '@/hooks/useCollections';
+import { useAuth } from '@/context/AuthContext';
 import {
   ProfileHero,
   ProfileStats,
@@ -13,13 +14,32 @@ import { CollectionTabs } from '@/components/ui';
 
 const EASE = [0.22, 1, 0.36, 1];
 
+/* ─── Иконка выхода ─── */
+function LogoutIcon({ className = 'w-4 h-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  );
+}
+
 export default function Profile() {
   const { login } = useParams();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [activeCollection, setActiveCollection] = useState(null);
 
   const { profile, stats, achievements, loading, error } =
     useProfile(login, activeCollection);
   const { collections } = useCollections();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
 
   if (loading) {
     return (
@@ -110,12 +130,33 @@ export default function Profile() {
           </motion.div>
         )}
 
+        {/* ─── Кнопка выхода (мобилка) ─── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2, ease: EASE }}
+          className="mt-12 flex justify-center md:hidden"
+        >
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl
+                       border border-[#F0E4D2] bg-white/70 backdrop-blur-sm
+                       text-[11px] font-black uppercase tracking-[0.22em]
+                       text-[#B87400]
+                       hover:bg-[#FFF4E0] hover:border-[#F0D0A0]
+                       active:scale-[0.97]
+                       transition-all"
+          >
+            <LogoutIcon className="w-4 h-4" />
+            Выйти
+          </button>
+        </motion.div>
+
         <div className="mt-14 flex justify-center">
-          <div className="inline-flex items-center gap-3 px-5 py-2
-                          rounded-full bg-white/50 border border-[#F0E4D2] backdrop-blur-sm">
+          <div className="inline-flex items-center gap-3">
             <span className="w-1.5 h-1.5 rounded-full bg-[#E60012]" />
             <span className="text-[9px] uppercase tracking-[0.35em] font-black text-zinc-400">
-              POP MART
+              Pop Mart
             </span>
           </div>
         </div>
