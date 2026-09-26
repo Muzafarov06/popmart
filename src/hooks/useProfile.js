@@ -2,32 +2,82 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+/* ─── Кэш справочника ачивок ─── */
+let achievementsRefPromise = null;
+function loadAchievementsRef() {
+  if (!achievementsRefPromise) {
+    achievementsRefPromise = supabase
+      .from('achievements')
+      .select('*')
+      .order('sort_order')
+      .then(({ data, error }) => {
+        if (error) throw error;
+        return data || [];
+      })
+      .catch((e) => {
+        achievementsRefPromise = null;
+        throw e;
+      });
+  }
+  return achievementsRefPromise;
+}
+
+/* ─── Кэш результатов ─── */
+const resultCache = new Map();
+const CACHE_TTL = 60 * 1000;
+
+function readCache(key) {
+  const hit = resultCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > CACHE_TTL) return null;
+  return hit.data;
+}
+
+function writeCache(key, data) {
+  resultCache.set(key, { data, ts: Date.now() });
+}
+
+/* Сброс кэша профиля (вызывать после кручения) */
+export function invalidateProfileCache(login) {
+  if (!login) {
+    resultCache.clear();
+    return;
+  }
+  for (const key of resultCache.keys()) {
+    if (key.startsWith(`${login}:`)) resultCache.delete(key);
+  }
+}
+
 export function useProfile(login, collectionId = null) {
-  const [data, setData] = useState({
-    profile: null,
-    stats: null,
-    achievements: [],
-    breakdown: {},
-  });
-  const [loading, setLoading] = useState(true);
+  const cacheKey = login ? `${login}:${collectionId || 'all'}` : null;
+  const initialHit = cacheKey ? readCache(cacheKey) : null;
+
+  const [data, setData] = useState(
+    initialHit || { profile: null, stats: null, achievements: [], breakdown: {} }
+  );
+  const [loading, setLoading] = useState(!initialHit);
   const [error, setError] = useState(null);
 
-  // Флаг: была ли уже первая успешная загрузка
-  const loadedOnceRef = useRef(false);
+  const loadedOnceRef = useRef(Boolean(initialHit));
 
   useEffect(() => {
     if (!login) return;
     let cancelled = false;
 
-    // Спиннер — только на самой первой загрузке
-    if (!loadedOnceRef.current) {
+    const key = `${login}:${collectionId || 'all'}`;
+    const hit = readCache(key);
+
+    if (hit) {
+      setData(hit);
+      setLoading(false);
+      loadedOnceRef.current = true;
+    } else if (!loadedOnceRef.current) {
       setLoading(true);
     }
     setError(null);
 
     (async () => {
       try {
-        // 1. Профиль
         const { data: profile, error: pErr } = await supabase
           .from('profiles')
           .select('id, login, display_name, role')
@@ -37,7 +87,8 @@ export function useProfile(login, collectionId = null) {
         if (pErr) throw pErr;
         if (!profile) {
           if (!cancelled) {
-            setData({ profile: null, stats: null, achievements: [], breakdown: {} });
+            const empty = { profile: null, stats: null, achievements: [], breakdown: {} };
+            setData(empty);
             setLoading(false);
             loadedOnceRef.current = true;
           }
@@ -45,9 +96,8 @@ export function useProfile(login, collectionId = null) {
         }
         if (cancelled) return;
 
-        // 2. Ачивки — фильтруем по коллекции
-        const [allAchRes, userAchRes] = await Promise.all([
-          supabase.from('achievements').select('*').order('sort_order'),
+        const [achRef, userAchRes] = await Promise.all([
+          loadAchievementsRef(),
           supabase
             .from('user_achievements')
             .select('achievement_id, collection_id')
@@ -65,53 +115,46 @@ export function useProfile(login, collectionId = null) {
           }
         }
 
-        const achievements = (allAchRes.data || []).map((a) => ({
+        const achievements = achRef.map((a) => ({
           ...a,
           earned: earnedSet.has(a.id),
         }));
 
-        // 3. Статистика
-        let stats;
-        if (collectionId) {
-          const { data: lb } = await supabase
-            .from('leaderboard_by_collection')
+        const [statsRes, bdRes] = await Promise.all([
+          collectionId
+            ? supabase
+                .from('leaderboard_by_collection')
+                .select('*')
+                .eq('id', profile.id)
+                .eq('collection_id', collectionId)
+                .maybeSingle()
+            : supabase
+                .from('leaderboard')
+                .select('*')
+                .eq('id', profile.id)
+                .maybeSingle(),
+          supabase
+            .from('user_breakdown')
             .select('*')
-            .eq('id', profile.id)
-            .eq('collection_id', collectionId)
-            .maybeSingle();
+            .eq('user_id', profile.id),
+        ]);
 
-          stats = lb || {
-            unique_count: 0,
-            total_pulls: 0,
-            secret_count: 0,
-            total_points: 0,
-          };
-        } else {
-          const { data: lb } = await supabase
-            .from('leaderboard')
-            .select('*')
-            .eq('id', profile.id)
-            .maybeSingle();
-
-          stats = lb || {
-            unique_count: 0,
-            total_pulls: 0,
-            secret_count: 0,
-            figure_points: 0,
-            achievement_count: 0,
-            achievement_points: 0,
-            total_points: 0,
-          };
-        }
-
-        // 4. Разбивка по редкостям
-        const { data: bd } = await supabase
-          .from('user_breakdown')
-          .select('*')
-          .eq('user_id', profile.id);
+        const stats =
+          statsRes.data ||
+          (collectionId
+            ? { unique_count: 0, total_pulls: 0, secret_count: 0, total_points: 0 }
+            : {
+                unique_count: 0,
+                total_pulls: 0,
+                secret_count: 0,
+                figure_points: 0,
+                achievement_count: 0,
+                achievement_points: 0,
+                total_points: 0,
+              });
 
         const breakdown = {};
-        for (const r of bd || []) {
+        for (const r of bdRes.data || []) {
           breakdown[r.rarity] = {
             unique: Number(r.unique_count) || 0,
             total: Number(r.total_pulls) || 0,
@@ -120,7 +163,10 @@ export function useProfile(login, collectionId = null) {
         }
 
         if (cancelled) return;
-        setData({ profile, stats, achievements, breakdown });
+
+        const fresh = { profile, stats, achievements, breakdown };
+        setData(fresh);
+        writeCache(key, fresh);
         setLoading(false);
         loadedOnceRef.current = true;
       } catch (e) {

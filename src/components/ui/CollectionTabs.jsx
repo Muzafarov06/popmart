@@ -33,9 +33,8 @@ export default function CollectionTabs({ collections = [], value, onChange }) {
               <motion.span
                 layoutId="collection-tab-bg"
                 transition={{ duration: 0.28, ease: EASE }}
-                className="absolute inset-0 rounded-xl
-                           bg-[linear-gradient(110deg,#FFB800,#FF9500_45%,#FF6B00)]
-                           shadow-[0_8px_18px_-8px_rgba(255,140,0,0.9)]"
+                className="absolute inset-0 rounded-xl bg-[#1A1A22]
+                           shadow-[0_8px_18px_-8px_rgba(26,26,34,0.7)]"
               />
             )}
             <span className="relative">{t.label}</span>

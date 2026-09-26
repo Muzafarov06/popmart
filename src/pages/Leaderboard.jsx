@@ -1,8 +1,7 @@
 // src/pages/Leaderboard.jsx
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
-import { useUserBreakdown } from '@/hooks/useUserBreakdown';
 import { useCollections } from '@/hooks/useCollections';
 import { LeaderboardTable } from '@/components/leaderboard';
 import { CollectionTabs } from '@/components/ui';
@@ -14,8 +13,17 @@ export default function Leaderboard() {
 
   const { rows, lastEvents, loading: lbLoading, error: lbError } =
     useLeaderboard(activeCollection);
-  const { byUser: breakdown } = useUserBreakdown();
   const { collections } = useCollections();
+
+  const activeFigures = useMemo(() => {
+    if (!activeCollection) return [];
+    return collections.find((c) => c.id === activeCollection)?.figures || [];
+  }, [collections, activeCollection]);
+
+  const totalFiguresAll = useMemo(
+    () => collections.reduce((s, c) => s + (c.figures?.length || 0), 0),
+    [collections]
+  );
 
   return (
     <div className="relative min-h-screen bg-[#FFF6EA] text-[#1A1A22] overflow-hidden">
@@ -36,20 +44,10 @@ export default function Leaderboard() {
           transition={{ duration: 0.6, ease: EASE }}
           className="max-w-2xl mb-8"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#E60012] rounded-sm mb-5">
-            <span className="text-white text-[8px] font-black tracking-[0.35em] uppercase">
-              Pop Mart
-            </span>
-          </div>
-
           <h1 className="font-heading font-black text-[40px] sm:text-[56px] md:text-[64px]
                          tracking-[-0.04em] leading-[0.95] text-[#1A1A22]">
             Кто впереди?
           </h1>
-
-          <p className="mt-5 text-[15px] sm:text-[16px] text-zinc-500 leading-relaxed">
-            Рейтинг обновляется в реальном времени. Клик по игроку — разбивка по редкостям.
-          </p>
         </motion.header>
 
         {/* Переключатель коллекций */}
@@ -75,8 +73,10 @@ export default function Leaderboard() {
         {!lbError && !lbLoading && rows.length > 0 && (
           <LeaderboardTable
             rows={rows}
-            breakdown={breakdown}
             lastEvents={lastEvents}
+            figures={activeFigures}
+            collectionId={activeCollection}
+            totalFiguresAll={totalFiguresAll}
           />
         )}
 
@@ -87,11 +87,10 @@ export default function Leaderboard() {
         )}
 
         <div className="mt-14 flex justify-center">
-          <div className="inline-flex items-center gap-3 px-5 py-2
-                          rounded-full bg-white/50 border border-[#F0E4D2] backdrop-blur-sm">
+          <div className="inline-flex items-center gap-3">
             <span className="w-1.5 h-1.5 rounded-full bg-[#E60012]" />
             <span className="text-[9px] uppercase tracking-[0.35em] font-black text-zinc-400">
-              POP MART
+              Pop Mart
             </span>
           </div>
         </div>

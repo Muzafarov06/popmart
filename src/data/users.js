@@ -1,3 +1,5 @@
+// src/data/users.js
+
 export const USERS = [
   {
     id: 'muzafon',
@@ -7,7 +9,7 @@ export const USERS = [
     role: 'admin',
     allowedCollections: ['*'],
     emoji: '🦊',
-    color: '#FF9500',
+    color: '#ff8800',
   },
   {
     id: 'yuzkov',
@@ -16,8 +18,8 @@ export const USERS = [
     name: 'Димон',
     role: 'player',
     allowedCollections: ['company-of-friends', 'smeshariki'],
-    emoji: '🐻',
-    color: '#2e7fca',
+    emoji: '🐳',
+    color: '#1b76ff',
   },
   {
     id: 'semenova',
@@ -26,8 +28,8 @@ export const USERS = [
     name: 'Настюха',
     role: 'player',
     allowedCollections: ['company-of-friends', 'smeshariki'],
-    emoji: '🐰',
-    color: '#FF8FA3',
+    emoji: '🦄',
+    color: '#e58fff',
   },
   {
     id: 'mitina',
@@ -36,8 +38,8 @@ export const USERS = [
     name: 'Сонька',
     role: 'player',
     allowedCollections: ['company-of-friends', 'smeshariki'],
-    emoji: '🐹',
-    color: '#FFB800',
+    emoji: '🦋',
+    color: '#ffd900',
   },
   {
     id: 'veronika',
@@ -48,6 +50,16 @@ export const USERS = [
     allowedCollections: ['smeshariki'],
     emoji: '🦢',
     color: '#8B5CF6',
+  },
+  {
+    id: 'surkina',
+    login: 'surkina',
+    email: 'surkina@popmart.local',
+    name: 'Понка',
+    role: 'player',
+    allowedCollections: ['smeshariki', 'bibizyan'],
+    emoji: '🐱',
+    color: '#ff0000',
   },
 ];
 

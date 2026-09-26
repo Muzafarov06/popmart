@@ -1,67 +1,120 @@
 // src/hooks/useHeaderData.js
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
 const LAST_SEEN_KEY = 'popmart_last_seen_feed_id';
 
-/**
- * Возвращает:
- *   activeCollectionId — id первой доступной коллекции (для кнопки «Открыть»)
- *   progress           — { owned, total } текущей активной коллекции
- *   newEventsCount     — сколько чужих событий появилось с последнего визита
- *   markAsRead         — сброс счётчика (вызывается при заходе на /leaderboard)
- */
+/* Глобальный кэш */
+let cache = null;
+const TTL = 60 * 1000;
+
+function readCache(userId) {
+  if (!cache) return null;
+  if (cache.userId !== userId) return null;
+  if (Date.now() - cache.ts > TTL) return null;
+  return cache.data;
+}
+function writeCache(userId, data) {
+  cache = { data, ts: Date.now(), userId };
+}
+
 export function useHeaderData() {
   const { user } = useAuth();
-  const [activeCollectionId, setActiveCollectionId] = useState(null);
-  const [progress, setProgress] = useState({ owned: 0, total: 0 });
-  const [newEventsCount, setNewEventsCount] = useState(0);
+  const userId = user?.supabaseId || user?.login;
 
-  /* ── Первичная загрузка ── */
-  useEffect(() => {
+  const cached = userId ? readCache(userId) : null;
+
+  const [activeCollectionId, setActiveCollectionId] = useState(
+    cached?.activeCollectionId || null
+  );
+  const [progress, setProgress] = useState(
+    cached?.progress || { owned: 0, total: 0 }
+  );
+  const [newEventsCount, setNewEventsCount] = useState(
+    cached?.newEventsCount || 0
+  );
+
+  const abortRef = useRef(null);
+
+  /* ── Загрузка ── */
+  const load = useCallback(async () => {
     if (!user) return;
-    let cancelled = false;
 
-    (async () => {
-      // 1. Активная коллекция (первая по sort_order)
-      const { data: cols } = await supabase
-        .from('collections')
-        .select('id, figures:figures(id)')
-        .eq('is_active', true)
-        .order('sort_order')
-        .limit(1);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-      if (cancelled || !cols?.length) return;
+    try {
+      const [colsRes, eventsCountRes] = await Promise.all([
+        supabase
+          .from('collections')
+          .select('id, figures:figures(id)')
+          .eq('is_active', true)
+          .order('sort_order')
+          .limit(1),
+        (async () => {
+          const lastSeen = Number(localStorage.getItem(LAST_SEEN_KEY) || 0);
+          return supabase
+            .from('feed_events')
+            .select('id', { count: 'exact', head: true })
+            .gt('id', lastSeen)
+            .neq('user_id', user.supabaseId);
+        })(),
+      ]);
+
+      if (controller.signal.aborted) return;
+
+      const cols = colsRes.data;
+      if (!cols?.length) return;
+
       const col = cols[0];
-      setActiveCollectionId(col.id);
       const total = col.figures?.length || 0;
 
-      // 2. Мой прогресс в этой коллекции
       const { data: uf } = await supabase
         .from('user_figures')
         .select('figure_id')
         .eq('collection_id', col.id);
 
-      if (cancelled) return;
-      setProgress({ owned: uf?.length || 0, total });
+      if (controller.signal.aborted) return;
 
-      // 3. Чужие события после last seen
-      const lastSeen = Number(localStorage.getItem(LAST_SEEN_KEY) || 0);
-      const { data: events } = await supabase
-        .from('feed_events')
-        .select('id')
-        .gt('id', lastSeen)
-        .neq('user_id', user.supabaseId);
+      const owned = uf?.length || 0;
+      const count = eventsCountRes.count || 0;
 
-      if (cancelled) return;
-      setNewEventsCount(events?.length || 0);
-    })();
+      setActiveCollectionId(col.id);
+      setProgress({ owned, total });
+      setNewEventsCount(count);
 
-    return () => { cancelled = true; };
-  }, [user?.supabaseId]);
+      writeCache(userId, {
+        activeCollectionId: col.id,
+        progress: { owned, total },
+        newEventsCount: count,
+      });
+    } catch (e) {
+      console.error('[useHeaderData]', e);
+    }
+  }, [user, userId]);
 
-  /* ── Realtime: обновляем прогресс и счётчик ── */
+  /* ── Первая загрузка + Realtime ── */
+  useEffect(() => {
+    if (!user) return;
+
+    const fresh = userId ? readCache(userId) : null;
+
+    if (fresh) {
+      setActiveCollectionId(fresh.activeCollectionId);
+      setProgress(fresh.progress);
+      setNewEventsCount(fresh.newEventsCount);
+      // тихое обновление
+      load();
+    } else {
+      load();
+    }
+
+    return () => abortRef.current?.abort();
+  }, [user, userId, load]);
+
+  /* ── Realtime ── */
   useEffect(() => {
     if (!user || !activeCollectionId) return;
 
@@ -72,12 +125,19 @@ export function useHeaderData() {
         { event: 'INSERT', schema: 'public', table: 'feed_events' },
         async () => {
           const lastSeen = Number(localStorage.getItem(LAST_SEEN_KEY) || 0);
-          const { data } = await supabase
+          const { count } = await supabase
             .from('feed_events')
-            .select('id')
+            .select('*', { count: 'exact', head: true })
             .gt('id', lastSeen)
             .neq('user_id', user.supabaseId);
-          setNewEventsCount(data?.length || 0);
+
+          const newCount = count || 0;
+          setNewEventsCount(newCount);
+          writeCache(userId, {
+            activeCollectionId,
+            progress,
+            newEventsCount: newCount,
+          });
         }
       )
       .on(
@@ -88,15 +148,22 @@ export function useHeaderData() {
             .from('user_figures')
             .select('figure_id')
             .eq('collection_id', activeCollectionId);
-          setProgress((p) => ({ ...p, owned: data?.length || 0 }));
+          setProgress((p) => {
+            const next = { ...p, owned: data?.length || 0 };
+            writeCache(userId, {
+              activeCollectionId,
+              progress: next,
+              newEventsCount,
+            });
+            return next;
+          });
         }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user?.supabaseId, activeCollectionId]);
+  }, [user, activeCollectionId, userId]);
 
-  /* ── Сброс счётчика ── */
   const markAsRead = useCallback(async () => {
     const { data } = await supabase
       .from('feed_events')
@@ -107,6 +174,10 @@ export function useHeaderData() {
       localStorage.setItem(LAST_SEEN_KEY, String(data[0].id));
     }
     setNewEventsCount(0);
+    if (cache) {
+      cache.data.newEventsCount = 0;
+      cache.ts = Date.now();
+    }
   }, []);
 
   return { activeCollectionId, progress, newEventsCount, markAsRead };

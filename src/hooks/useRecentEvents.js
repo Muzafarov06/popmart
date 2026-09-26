@@ -2,13 +2,38 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+const cache = new Map();
+const TTL = 30 * 1000;
+
+const key = (limit, collectionId) => `${limit}:${collectionId || 'all'}`;
+
+function readCache(k) {
+  const hit = cache.get(k);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > TTL) return null;
+  return hit.data;
+}
+function writeCache(k, data) {
+  cache.set(k, { data, ts: Date.now() });
+}
+
 export function useRecentEvents(limit = 20, collectionId = null) {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const k = key(limit, collectionId);
+  const cached = readCache(k);
+
+  const [events, setEvents] = useState(cached || []);
+  const [loading, setLoading] = useState(!cached);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+
+    const hit = readCache(k);
+    if (hit) {
+      setEvents(hit);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
 
     (async () => {
       try {
@@ -28,7 +53,10 @@ export function useRecentEvents(limit = 20, collectionId = null) {
 
         const { data, error } = await query;
         if (error) throw error;
-        if (!cancelled) setEvents(data || []);
+        if (!cancelled) {
+          setEvents(data || []);
+          writeCache(k, data || []);
+        }
       } catch (e) {
         console.error('[useRecentEvents]', e);
       } finally {
@@ -36,10 +64,8 @@ export function useRecentEvents(limit = 20, collectionId = null) {
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [limit, collectionId]);
+    return () => { cancelled = true; };
+  }, [limit, collectionId, k]);
 
   return { events, loading };
 }

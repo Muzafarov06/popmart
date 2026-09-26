@@ -4,18 +4,13 @@ import { useLocation } from 'react-router-dom';
 
 /**
  * Вызывает callback каждый раз, когда меняется route (pathname).
- * Полезно для обновления данных при возврате на страницу.
- *
- * Пример:
- *   const { refresh } = useCollections();
- *   useRefreshOnRoute(refresh);
+ * Не сбрасывает кэш — только тихое обновление в фоне.
  */
 export function useRefreshOnRoute(callback) {
   const { pathname } = useLocation();
   const isFirst = useRef(true);
 
   useEffect(() => {
-    // На первом рендере не вызываем — данные и так загружаются
     if (isFirst.current) {
       isFirst.current = false;
       return;

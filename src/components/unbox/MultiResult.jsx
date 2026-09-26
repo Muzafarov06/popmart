@@ -1,36 +1,26 @@
 // src/components/unbox/MultiResult.jsx
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getRarity } from '@/data/rarity';
 
 const EASE = [0.22, 1, 0.36, 1];
 
 function getCardWidth(total) {
-  if (total <= 3)  return 'w-32 sm:w-40 md:w-48';
-  if (total <= 6)  return 'w-24 sm:w-32 md:w-40';
-  if (total <= 8)  return 'w-20 sm:w-28 md:w-36';
-  if (total <= 12) return 'w-16 sm:w-24 md:w-32';
-  if (total <= 20) return 'w-14 sm:w-20 md:w-28';
-  if (total <= 40) return 'w-12 sm:w-16 md:w-24';
-  return 'w-10 sm:w-14 md:w-20';
+  if (total === 1) return 'w-48 sm:w-56 md:w-64';
+  if (total === 2) return 'w-40 sm:w-48 md:w-56';
+  if (total === 3) return 'w-32 sm:w-40 md:w-48 lg:w-56';
+  if (total <= 5)  return 'w-28 sm:w-36 md:w-44 lg:w-52';
+  if (total <= 8)  return 'w-24 sm:w-32 md:w-40 lg:w-48';
+  return 'w-20 sm:w-28 md:w-36 lg:w-44';
 }
 
-export default function MultiResult({ results, newCount = 0, onClose }) {
+export default function MultiResult({ results, newCount = 0, collectionId, onClose }) {
   const uniqueCount = useMemo(
     () => new Set(results.map((r) => r.id)).size,
     [results]
   );
 
-  const enhanced = useMemo(() => {
-    const seen = new Set();
-    return results.map((r) => {
-      const firstInBatch = !seen.has(r.id);
-      seen.add(r.id);
-      return { ...r, firstInBatch };
-    });
-  }, [results]);
-
-  const cardWidth = getCardWidth(results.length);
   const total = results.length;
 
   return (
@@ -39,113 +29,116 @@ export default function MultiResult({ results, newCount = 0, onClose }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ duration: 0.6, ease: EASE }}
-      className="flex flex-col items-center w-full"
+      onClick={onClose}
+      className="flex flex-col items-center w-full
+                 cursor-pointer select-none"
     >
-      {/* Заголовок — аккуратный, POP MART-стиль */}
+      {/* ═══ Заголовок ═══ */}
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: EASE }}
         className="flex flex-col items-center gap-3"
       >
+        
 
-
-        <h2 className="font-heading font-black text-[30px] sm:text-[40px] md:text-[48px]
+        {/* Заголовок */}
+        <h2 className="font-heading font-black text-[28px] sm:text-[36px] md:text-[42px]
                        tracking-[-0.035em] leading-[1.05] text-[#1A1A22] text-center">
           {newCount > 0
             ? newCount === 1
               ? 'Одна новая!'
-              : `+${newCount} новых!`
+              : `${newCount} новых!`
             : 'Все повторки'}
         </h2>
-
-        <p className="text-[11px] uppercase tracking-[0.3em] text-zinc-400 font-bold text-center">
-          {newCount > 0
-            ? 'Новые просмотрены — вот что ты выбил'
-            : 'Ничего нового, но прогресс копится'}
-        </p>
       </motion.div>
 
-      {/* Статистика — в таблетках */}
+      {/* ═══ Таблетки статистики ═══ */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.5 }}
-        className="mt-6 flex items-center gap-2 flex-wrap justify-center"
+        transition={{ delay: 0.15, duration: 0.5 }}
+        className="mt-5 flex items-center gap-2 flex-wrap justify-center"
       >
-        <StatPill label="Новых" value={newCount} color="#1E7A44" />
-        <StatPill label="Уникальных" value={uniqueCount} color="#B87400" />
-        <StatPill label="Всего" value={total} color="#52525b" />
+        <StatPill label="новых" value={newCount} color="#1E7A44" />
+        <StatPill label="уникальных" value={uniqueCount} color="#B87400" />
+        <StatPill label="всего" value={total} color="#52525b" />
       </motion.div>
 
-      {/* Сетка карточек */}
+      {/* ═══ Сетка карточек ═══ */}
       <div
         className="mt-10 w-full flex flex-wrap justify-center items-start
-                   gap-2 sm:gap-3 max-h-[55vh] overflow-y-auto overflow-x-hidden
-                   px-2 pb-2"
-        style={{ scrollbarWidth: 'thin' }}
+                   gap-3 sm:gap-4 max-h-[55vh] overflow-y-auto
+                   px-2 pb-2
+                   [scrollbar-width:none]
+                   [&::-webkit-scrollbar]:hidden"
       >
-        {enhanced.map((result, i) => {
+        {results.map((result, i) => {
           const rarity = getRarity(result.rarity);
           const isNew = result.isNew;
-          const isFirstInBatch = result.firstInBatch;
 
           return (
             <motion.div
-              key={i}
-              initial={{ opacity: 0, scale: 0.7 }}
-              animate={{ opacity: 1, scale: 1 }}
+              key={`${result.id}-${i}`}
+              initial={{ opacity: 0, scale: 0.7, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{
-                duration: 0.35,
-                delay: Math.min(i * 0.015, 1),
+                duration: 0.4,
+                delay: Math.min(i * 0.06, 0.6),
                 ease: EASE,
               }}
               className={`
-                ${cardWidth}
+                ${getCardWidth(total)}
                 relative overflow-hidden aspect-[3/4] shrink-0
-                rounded-xl sm:rounded-2xl
-                ${
-                  isNew
-                    ? 'ring-2 ring-[#1E7A44] shadow-[0_12px_24px_-12px_rgba(30,122,68,0.6)]'
-                    : isFirstInBatch
-                    ? 'ring-1 ring-[#E7D5BC] shadow-[0_6px_12px_-6px_rgba(120,60,0,0.25)]'
-                    : 'ring-1 ring-[#E7D5BC]/50 opacity-60'
-                }
+                rounded-2xl
+                shadow-[0_16px_32px_-16px_rgba(120,60,0,0.4)]
+                ${isNew ? 'ring-2 ring-[#1E7A44]' : 'ring-1 ring-[#E7D5BC]/60'}
               `}
-              style={{
-                background: `linear-gradient(160deg, ${rarity.color}10, ${rarity.color}25)`,
-              }}
             >
+              {/* Карточка */}
               {result.card ? (
                 <img
                   src={result.card}
                   alt={result.name}
                   className="absolute inset-0 w-full h-full object-cover select-none"
                   loading="lazy"
+                  draggable={false}
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center p-2">
-                  <span className="font-heading font-black text-[10px] sm:text-xs text-center leading-tight">
+                <div
+                  className="absolute inset-0 flex items-center justify-center p-2"
+                  style={{ background: `${rarity.color}15` }}
+                >
+                  <span className="font-heading font-black text-[10px] sm:text-xs
+                                   text-center leading-tight text-[#1A1A22]">
                     {result.name}
                   </span>
                 </div>
               )}
 
-              {/* NEW бейдж — статичный, без пульсации */}
+              {/* Бейдж NEW — маленький, справа-сверху */}
               {isNew && (
-                <span
-                  className="absolute top-1 right-1 px-1.5 py-0.5 rounded-md
-                             bg-[#1E7A44] text-white text-[7px] sm:text-[8px]
-                             font-black tracking-wider shadow-md z-10"
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 + i * 0.06, duration: 0.3 }}
+                  className="absolute top-2 right-2 z-10
+                             inline-flex items-center gap-1
+                             px-2 py-0.5 rounded-md
+                             bg-[#1E7A44] text-white
+                             text-[7px] sm:text-[8px] font-black uppercase
+                             tracking-[0.18em]
+                             shadow-[0_6px_14px_-6px_rgba(30,122,68,0.9)]"
                 >
-                  NEW
-                </span>
+                  <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+                  New
+                </motion.span>
               )}
 
-              {/* Полоска редкости снизу */}
+              {/* Цветная полоска редкости снизу */}
               <span
                 aria-hidden
-                className="absolute bottom-0 left-0 right-0 h-1 pointer-events-none z-10"
+                className="absolute bottom-0 left-0 right-0 h-1.5 pointer-events-none z-10"
                 style={{ background: rarity.color }}
               />
             </motion.div>
@@ -153,28 +146,23 @@ export default function MultiResult({ results, newCount = 0, onClose }) {
         })}
       </div>
 
-      {/* Кнопка */}
+      {/* ═══ «В коллекцию» — тихая ссылка ═══ */}
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4, duration: 0.5 }}
-        className="mt-10 w-full max-w-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.2, duration: 0.6, ease: EASE }}
+        className="mt-14 mb-4"
+        onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={onClose}
-          className="pm-btn group relative w-full overflow-hidden rounded-2xl
-                     bg-[linear-gradient(90deg,#FFB800,#FF9500_50%,#FF6B00)]
-                     py-4 font-heading text-[12px] font-black uppercase tracking-[0.22em] text-white
-                     shadow-[0_14px_30px_-12px_rgba(255,140,0,0.9)]
-                     hover:shadow-[0_20px_40px_-12px_rgba(255,140,0,1)]
-                     transition-shadow"
+        <Link
+          to={collectionId ? `/collection/${collectionId}` : '/'}
+          className="inline-flex items-center gap-1
+                     text-[11px] uppercase tracking-[0.28em] font-medium
+                     text-zinc-400 hover:text-[#B87400] transition-colors"
         >
-          <span className="relative z-10">Ещё раз</span>
-          <span
-            aria-hidden
-            className="pm-shine absolute inset-y-0 -left-1/3 w-1/3 bg-white/40 blur-md"
-          />
-        </button>
+          В коллекцию
+          <span className="text-[13px] leading-none">→</span>
+        </Link>
       </motion.div>
     </motion.div>
   );
@@ -183,10 +171,8 @@ export default function MultiResult({ results, newCount = 0, onClose }) {
 /* ─── Таблетка статистики ─── */
 function StatPill({ label, value, color }) {
   return (
-    <div
-      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full
-                 bg-white/70 border border-[#F0E4D2] backdrop-blur-sm"
-    >
+    <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full
+                    bg-white/70 border border-[#F0E4D2] backdrop-blur-sm">
       <span
         className="w-1.5 h-1.5 rounded-full"
         style={{ background: color }}

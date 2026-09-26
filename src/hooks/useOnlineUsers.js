@@ -3,43 +3,60 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
-/**
- * Возвращает:
- *   online      — массив логинов, кто сейчас в сети (присутствие)
- *   allowed     — массив логинов, с кем у меня есть общая коллекция
- *                 (или админ, или я сам). null пока грузится.
- */
+/* Кэш shared_users — обновляем раз в 5 минут */
+let sharedCache = null;
+const SHARED_TTL = 5 * 60 * 1000;
+
+async function loadSharedUsers() {
+  if (sharedCache && Date.now() - sharedCache.ts < SHARED_TTL) {
+    return sharedCache.data;
+  }
+  const { data, error } = await supabase.rpc('shared_users');
+  if (error) throw error;
+  sharedCache = { data: data || [], ts: Date.now() };
+  return sharedCache.data;
+}
+
 export function useOnlineUsers() {
   const { user } = useAuth();
   const [online, setOnline] = useState([]);
   const [allowed, setAllowed] = useState(null);
+  const [lastSeen, setLastSeen] = useState({});
 
-  /* ─── 1. Список разрешённых логинов ─── */
+  /* ─── 1. Загружаем разрешённых ─── */
   useEffect(() => {
     if (!user?.supabaseId) {
       setAllowed([]);
+      setLastSeen({});
       return;
     }
     let cancelled = false;
 
     (async () => {
-      const { data, error } = await supabase.rpc('shared_users');
-      if (cancelled) return;
+      try {
+        const data = await loadSharedUsers();
+        if (cancelled) return;
 
-      if (error) {
-        console.error('[useOnlineUsers] shared_users:', error);
-        setAllowed([]);
-        return;
+        const logins = data.map((r) => r.login);
+        const ls = {};
+        for (const r of data) {
+          if (r.last_seen_at) ls[r.login] = r.last_seen_at;
+        }
+
+        setAllowed(logins);
+        setLastSeen(ls);
+      } catch (e) {
+        if (!cancelled) {
+          console.error('[useOnlineUsers] shared_users:', e);
+          setAllowed([]);
+        }
       }
-      setAllowed((data || []).map((r) => r.login));
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [user?.supabaseId]);
 
-  /* ─── 2. Realtime Presence + фильтр ─── */
+  /* ─── 2. Realtime Presence ─── */
   useEffect(() => {
     if (!user?.login || !allowed) {
       setOnline([]);
@@ -62,13 +79,12 @@ export function useOnlineUsers() {
             login: user.login,
             online_at: new Date().toISOString(),
           });
+          await supabase.rpc('touch_last_seen');
         }
       });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user?.login, allowed]);
 
-  return { online, allowed };
+  return { online, allowed, lastSeen };
 }

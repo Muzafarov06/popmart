@@ -1,16 +1,7 @@
 // src/components/home/Header.jsx
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const EASE = [0.22, 1, 0.36, 1];
-
-function plural(n, forms) {
-  const a = Math.abs(n) % 100;
-  const b = a % 10;
-  if (a > 10 && a < 20) return forms[2];
-  if (b > 1 && b < 5) return forms[1];
-  if (b === 1) return forms[0];
-  return forms[2];
-}
 
 function WordPlaque({ children }) {
   return (
@@ -30,7 +21,7 @@ function WordPlaque({ children }) {
   );
 }
 
-export default function Header({ user, count, active }) {
+export default function Header() {
   return (
     <motion.header
       initial={{ opacity: 0, y: 20 }}
@@ -46,7 +37,7 @@ export default function Header({ user, count, active }) {
                    mx-auto md:mx-0"
         style={{ fontSize: 'clamp(38px, 8.5vw, 68px)' }}
       >
-        {/* ── МОБИЛЬНАЯ ВЕРСИЯ: три строки ── */}
+        {/* ── МОБИЛЬНАЯ ВЕРСИЯ ── */}
         <span className="md:hidden">
           <motion.span
             initial={{ opacity: 0, y: 18 }}
@@ -76,7 +67,7 @@ export default function Header({ user, count, active }) {
           </motion.span>
         </span>
 
-        {/* ── ДЕСКТОПНАЯ ВЕРСИЯ: одна строка ── */}
+        {/* ── ДЕСКТОПНАЯ ВЕРСИЯ ── */}
         <span className="hidden md:inline-flex items-baseline gap-6 flex-nowrap">
           <motion.span
             initial={{ opacity: 0, y: 18 }}
@@ -109,32 +100,13 @@ export default function Header({ user, count, active }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.9 }}
-        className="mt-3 sm:mt-4
+        className="mt-4 sm:mt-5
                    text-[10px] sm:text-[11px] uppercase
                    tracking-[0.4em] font-black text-zinc-400
                    mx-auto md:mx-0"
       >
         Открой коробку — узнаешь
       </motion.p>
-
-      {/* ═══ Описание коллекции ═══ */}
-      <div className="mt-4 sm:mt-5 min-h-[40px]">
-        <AnimatePresence mode="wait">
-          <motion.p
-            key={active?.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.35, ease: EASE }}
-            className="mx-auto max-w-md
-                       text-[13.5px] sm:text-[15px] md:text-[16px]
-                       leading-relaxed text-zinc-500
-                       px-4 md:px-0 md:mx-0"
-          >
-            {active?.description || 'Собери всю коллекцию'}
-          </motion.p>
-        </AnimatePresence>
-      </div>
     </motion.header>
   );
 }

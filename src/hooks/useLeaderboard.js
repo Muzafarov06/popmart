@@ -1,20 +1,35 @@
 // src/hooks/useLeaderboard.js
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-/**
- * @param {string|null} collectionId — id коллекции или null для общей таблицы
- */
+const cache = new Map();
+const TTL = 30 * 1000;
+
+function readCache(key) {
+  const hit = cache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > TTL) return null;
+  return hit;
+}
+function writeCache(key, rows, lastEvents) {
+  cache.set(key, { rows, lastEvents, ts: Date.now() });
+}
+
 export function useLeaderboard(collectionId = null) {
-  const [rows, setRows] = useState([]);
-  const [lastEvents, setLastEvents] = useState({});
-  const [loading, setLoading] = useState(true);
+  const key = collectionId || 'all';
+  const hit = readCache(key);
+
+  const [rows, setRows] = useState(hit?.rows || []);
+  const [lastEvents, setLastEvents] = useState(hit?.lastEvents || {});
+  const [loading, setLoading] = useState(!hit);
   const [error, setError] = useState(null);
 
-  const load = useCallback(async () => {
-    setError(null);
+  const loadedOnceRef = useRef(Boolean(hit));
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setError(null);
+
     try {
-      // 1. Основные строки
       let lbQuery;
       if (collectionId) {
         lbQuery = supabase
@@ -31,7 +46,6 @@ export function useLeaderboard(collectionId = null) {
           .order('secret_count', { ascending: false });
       }
 
-      // 2. Последние события (можно фильтровать по коллекции)
       let leQuery = supabase.from('last_events_per_user').select('*');
       if (collectionId) {
         leQuery = leQuery.eq('collection_id', collectionId);
@@ -41,36 +55,49 @@ export function useLeaderboard(collectionId = null) {
       if (lbRes.error) throw lbRes.error;
       if (leRes.error) throw leRes.error;
 
-      setRows(lbRes.data || []);
-
+      const newRows = lbRes.data || [];
       const map = {};
       for (const e of leRes.data || []) map[e.user_id] = e;
+
+      setRows(newRows);
       setLastEvents(map);
+      writeCache(key, newRows, map);
     } catch (e) {
-      console.error('[useLeaderboard]', e);
-      setError(e.message || 'Ошибка загрузки');
+      if (!silent) {
+        console.error('[useLeaderboard]', e);
+        setError(e.message || 'Ошибка загрузки');
+      }
     } finally {
       setLoading(false);
+      loadedOnceRef.current = true;
     }
-  }, [collectionId]);
+  }, [collectionId, key]);
 
   useEffect(() => {
-    setLoading(true);
-    load();
+    const fresh = readCache(key);
+
+    if (fresh) {
+      setRows(fresh.rows);
+      setLastEvents(fresh.lastEvents);
+      setLoading(false);
+      loadedOnceRef.current = true;
+      load(true); // тихо
+    } else {
+      if (!loadedOnceRef.current) setLoading(true);
+      load(false);
+    }
 
     const channel = supabase
-      .channel(`leaderboard-realtime-${collectionId || 'all'}`)
+      .channel(`leaderboard-rt-${key}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'feed_events' },
-        () => load()
+        () => load(true)
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [load, collectionId]);
+    return () => { supabase.removeChannel(channel); };
+  }, [load, key]);
 
   return { rows, lastEvents, loading, error, refresh: load };
 }

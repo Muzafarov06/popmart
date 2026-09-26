@@ -3,7 +3,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
-/* ─── ХЕЛПЕРЫ ─── */
+let cache = null;
+const TTL = 60 * 1000;
+
+function readCache(userId) {
+  if (!cache) return null;
+  if (cache.userId !== userId) return null;
+  if (Date.now() - cache.ts > TTL) return null;
+  return cache.data;
+}
+function writeCache(userId, data) {
+  cache = { data, ts: Date.now(), userId };
+}
 
 function groupOwnedByCollection(rows) {
   const map = {};
@@ -34,23 +45,21 @@ function buildCollection(raw, ownedMap) {
   };
 }
 
-/* ─── ХУК ─── */
-
 export function useCollections() {
   const { user } = useAuth();
+  const userId = user?.supabaseId || user?.login;
 
-  const [collections, setCollections] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cached = userId ? readCache(userId) : null;
+
+  const [collections, setCollections] = useState(cached || []);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState(null);
-  const [tick, setTick] = useState(0);
-
   const abortRef = useRef(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!user) {
       setCollections([]);
       setLoading(false);
-      setError(null);
       return;
     }
 
@@ -58,63 +67,63 @@ export function useCollections() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setLoading(true);
-    setError(null);
+    if (!silent) setError(null);
 
     try {
-      // ── 1. Коллекции + фигурки ──
-      const { data: cols, error: colErr } = await supabase
-        .from('collections')
-        .select(`
-            id, name, description, cover, hero_cover, display_cover, is_active, sort_order,
+      const [colsRes, ufRes] = await Promise.all([
+        supabase
+          .from('collections')
+          .select(`
+            id, name, description, cover, hero_cover, display_cover,
+            is_active, sort_order,
             figures:figures(
-            id, name, rarity, weight, points,
-            image, card, silhouette, is_secret, sort_order
+              id, name, rarity, weight, points,
+              image, card, silhouette, is_secret, sort_order
             )
-        `)
-        .eq('is_active', true)
-        .order('sort_order');
+          `)
+          .eq('is_active', true)
+          .order('sort_order'),
+        supabase.from('user_figures').select('collection_id, figure_id, count'),
+      ]);
 
-      if (colErr) throw colErr;
+      if (colsRes.error) throw colsRes.error;
+      if (ufRes.error) throw ufRes.error;
       if (controller.signal.aborted) return;
 
-      // ── 2. Открытия юзера ──
-      // ✅ Убрали .eq('user_id', user.id) — RLS вернёт только свои строки
-      const { data: userFigures, error: ufErr } = await supabase
-        .from('user_figures')
-        .select('collection_id, figure_id, count');
-
-      if (ufErr) throw ufErr;
-      if (controller.signal.aborted) return;
-
-      // ── 3. Агрегация ──
-      const ownedMap = groupOwnedByCollection(userFigures);
-      const result = (cols || []).map((c) => buildCollection(c, ownedMap));
+      const ownedMap = groupOwnedByCollection(ufRes.data);
+      const result = (colsRes.data || []).map((c) => buildCollection(c, ownedMap));
 
       setCollections(result);
+      writeCache(userId, result);
       setLoading(false);
     } catch (e) {
       if (controller.signal.aborted || e.name === 'AbortError') return;
-      console.error('[useCollections]', e);
-      setError(e.message || 'Ошибка загрузки');
+      if (!silent) {
+        console.error('[useCollections]', e);
+        setError(e.message || 'Ошибка загрузки');
+      }
       setLoading(false);
     }
-  }, [user]);
+  }, [user, userId]);
 
   useEffect(() => {
-    load();
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, [load]);
+    const fresh = userId ? readCache(userId) : null;
 
+    if (fresh) {
+      setCollections(fresh);
+      setLoading(false);
+      load(true);
+    } else {
+      load(false);
+    }
+
+    return () => abortRef.current?.abort();
+  }, [load, userId]);
+
+  // ⚠️ Без сброса кэша — только фоновое обновление
   const refresh = useCallback(() => {
-    setTick((t) => t + 1);
-  }, []);
-
-  useEffect(() => {
-    if (tick > 0) load();
-  }, [tick, load]);
+    load(true);
+  }, [load]);
 
   return { collections, loading, error, refresh };
 }

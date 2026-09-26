@@ -4,24 +4,20 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useCollections } from '@/hooks/useCollections';
 import { useRefreshOnRoute } from '@/hooks/useRefreshOnFocus';
-import { useRecentEvents } from '@/hooks/useRecentEvents';
 import {
   BackgroundFX,
   Header,
   BoxCarousel,
   CollectionPanel,
-  BottomStripe,
   HomeLoading,
   HomeError,
   HomeEmpty,
 } from '@/components/home';
-import { LiveTicker } from '@/components/leaderboard';
 
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { collections, loading, error, refresh } = useCollections();
-  const { events } = useRecentEvents(15);
 
   const [index, setIndex] = useState(0);
   const count = collections.length;
@@ -58,43 +54,36 @@ export default function Home() {
   };
 
   return (
-    <>
-      <div className="relative min-h-screen overflow-hidden bg-[#FFF6EA] text-[#1A1A22]">
-        <BackgroundFX />
+    <div className="relative min-h-screen overflow-hidden bg-[#FFF6EA] text-[#1A1A22]">
+      <BackgroundFX />
 
-        {/* main теперь совпадает с хедером: max-w-7xl + px-3 sm:px-6 lg:px-10 */}
-        <main className="relative z-10 mx-auto max-w-7xl
-                         px-3 sm:px-6 lg:px-10
-                         pb-52 pt-4 sm:pt-6 md:pt-8">
-          <Header user={user} count={count} active={active} />
+      <main className="relative z-10 mx-auto max-w-7xl
+                       px-3 sm:px-6 lg:px-10
+                       pt-4 sm:pt-6 md:pt-8 pb-10">
+        <Header />
 
-          <div className="mt-6 grid items-center gap-10 md:mt-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
-            <BoxCarousel
-              collections={collections}
-              index={index}
-              onChange={setIndex}
-              onNext={() => go(1)}
-              onPrev={() => go(-1)}
-            />
+        <div className="mt-8 grid items-center gap-10 md:mt-12
+                        lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
+          <BoxCarousel
+            collections={collections}
+            index={index}
+            onChange={setIndex}
+            onNext={() => go(1)}
+            onPrev={() => go(-1)}
+          />
 
-            <CollectionPanel collection={active} onOpen={handleOpen} />
+          <CollectionPanel collection={active} onOpen={handleOpen} />
+        </div>
+
+        <div className="mt-14 flex justify-center">
+          <div className="inline-flex items-center gap-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#E60012]" />
+            <span className="text-[9px] uppercase tracking-[0.35em] font-black text-zinc-400">
+              Pop Mart
+            </span>
           </div>
-
-          {events.length > 0 && (
-            <div className="mt-10 sm:mt-12">
-              <LiveTicker events={events} />
-            </div>
-          )}
-        </main>
-      </div>
-
-      <BottomStripe />
-
-      <style>{`
-        @keyframes pm-shine { to { transform: translateX(340%) skewX(-20deg); } }
-        .pm-btn .pm-shine { transform: translateX(-160%) skewX(-20deg); }
-        .pm-btn:hover:not(.disabled) .pm-shine { animation: pm-shine .85s ease; }
-      `}</style>
-    </>
+        </div>
+      </main>
+    </div>
   );
 }

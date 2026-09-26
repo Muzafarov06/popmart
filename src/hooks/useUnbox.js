@@ -1,8 +1,11 @@
 // src/hooks/useUnbox.js
 import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { invalidateProfileCache } from './useProfile';
+import { invalidateBreakdownCache } from './useUserBreakdown';
+import { invalidateUserFigures } from './useUserFigures';
 
-function mapRow(row) {
+export function mapRow(row) {
   return {
     id:        row.result_figure_id,
     name:      row.result_name,
@@ -11,7 +14,7 @@ function mapRow(row) {
     image:     row.result_image,
     card:      row.result_card,
     is_secret: row.result_is_secret,
-    isNew:     Boolean(row.result_is_new), // ✅ приводим к bool на всякий случай
+    isNew:     Boolean(row.result_is_new),
   };
 }
 
@@ -24,6 +27,13 @@ export function useUnbox() {
     setError(null);
   }, []);
 
+  /* После кручения — сброс кэшей, чтобы при заходе в профиль/лидерборд были свежие данные */
+  const invalidateCaches = useCallback((userId, collectionId) => {
+    invalidateProfileCache();
+    invalidateBreakdownCache();
+    if (userId) invalidateUserFigures(userId, collectionId);
+  }, []);
+
   const unbox = useCallback(async (collectionId) => {
     setLoading(true);
     setError(null);
@@ -34,6 +44,11 @@ export function useUnbox() {
       if (rpcError) throw rpcError;
       const row = Array.isArray(data) ? data[0] : data;
       if (!row) throw new Error('Пустой ответ от open_box');
+
+      // Инвалидация после каждого открытия
+      const { data: { user } } = await supabase.auth.getUser();
+      invalidateCaches(user?.id, collectionId);
+
       return mapRow(row);
     } catch (e) {
       console.error('[useUnbox]', e);
@@ -42,7 +57,7 @@ export function useUnbox() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [invalidateCaches]);
 
   const unboxMany = useCallback(async (collectionId, count = 10) => {
     setLoading(true);
@@ -54,6 +69,10 @@ export function useUnbox() {
       });
       if (rpcError) throw rpcError;
       if (!Array.isArray(data)) return [];
+
+      const { data: { user } } = await supabase.auth.getUser();
+      invalidateCaches(user?.id, collectionId);
+
       return data.map(mapRow);
     } catch (e) {
       console.error('[useUnbox] many', e);
@@ -62,7 +81,7 @@ export function useUnbox() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [invalidateCaches]);
 
   return { unbox, unboxMany, loading, error, reset };
 }
