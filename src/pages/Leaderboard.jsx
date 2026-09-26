@@ -1,14 +1,21 @@
 // src/pages/Leaderboard.jsx
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useUserBreakdown } from '@/hooks/useUserBreakdown';
+import { useCollections } from '@/hooks/useCollections';
 import { LeaderboardTable } from '@/components/leaderboard';
+import { CollectionTabs } from '@/components/ui';
 
 const EASE = [0.22, 1, 0.36, 1];
 
 export default function Leaderboard() {
-  const { rows, lastEvents, loading: lbLoading, error: lbError } = useLeaderboard();
+  const [activeCollection, setActiveCollection] = useState(null);
+
+  const { rows, lastEvents, loading: lbLoading, error: lbError } =
+    useLeaderboard(activeCollection);
   const { byUser: breakdown } = useUserBreakdown();
+  const { collections } = useCollections();
 
   return (
     <div className="relative min-h-screen bg-[#FFF6EA] text-[#1A1A22] overflow-hidden">
@@ -21,16 +28,19 @@ export default function Leaderboard() {
                         bg-[linear-gradient(180deg,#FFF9F0,transparent)]" />
       </div>
 
-      {/* Выровнено по хедеру: max-w-7xl + px-3 sm:px-6 lg:px-10 */}
       <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-6 lg:px-10 py-10 md:py-14">
 
         <motion.header
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: EASE }}
-          className="max-w-2xl mb-10"
+          className="max-w-2xl mb-8"
         >
-
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#E60012] rounded-sm mb-5">
+            <span className="text-white text-[8px] font-black tracking-[0.35em] uppercase">
+              Pop Mart
+            </span>
+          </div>
 
           <h1 className="font-heading font-black text-[40px] sm:text-[56px] md:text-[64px]
                          tracking-[-0.04em] leading-[0.95] text-[#1A1A22]">
@@ -41,6 +51,20 @@ export default function Leaderboard() {
             Рейтинг обновляется в реальном времени. Клик по игроку — разбивка по редкостям.
           </p>
         </motion.header>
+
+        {/* Переключатель коллекций */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: EASE }}
+          className="mb-6"
+        >
+          <CollectionTabs
+            collections={collections}
+            value={activeCollection}
+            onChange={setActiveCollection}
+          />
+        </motion.div>
 
         {lbError && (
           <div className="mb-8 text-center text-red-500 text-sm">

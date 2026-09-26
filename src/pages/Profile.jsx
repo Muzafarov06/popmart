@@ -1,18 +1,25 @@
 // src/pages/Profile.jsx
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useProfile } from '@/hooks/useProfile';
+import { useCollections } from '@/hooks/useCollections';
 import {
   ProfileHero,
   ProfileStats,
   AchievementsGrid,
 } from '@/components/profile';
+import { CollectionTabs } from '@/components/ui';
 
 const EASE = [0.22, 1, 0.36, 1];
 
 export default function Profile() {
   const { login } = useParams();
-  const { profile, stats, achievements, loading, error } = useProfile(login);
+  const [activeCollection, setActiveCollection] = useState(null);
+
+  const { profile, stats, achievements, loading, error } =
+    useProfile(login, activeCollection);
+  const { collections } = useCollections();
 
   if (loading) {
     return (
@@ -54,7 +61,6 @@ export default function Profile() {
 
       <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-6 lg:px-10 py-10 md:py-14">
 
-        {/* Навигация назад */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -72,20 +78,38 @@ export default function Profile() {
           </Link>
         </motion.div>
 
-        {/* Hero: аватар + имя + роль + очки крупно */}
         <ProfileHero profile={profile} stats={stats} />
 
-        {/* Статистика: 4 плитки + разбивка очков */}
+        {/* Переключатель коллекций */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: EASE }}
+          className="mt-6"
+        >
+          <CollectionTabs
+            collections={collections}
+            value={activeCollection}
+            onChange={setActiveCollection}
+          />
+        </motion.div>
+
         <div className="mt-6">
           <ProfileStats stats={stats} />
         </div>
 
-        {/* Достижения */}
-        <div className="mt-12">
-          <AchievementsGrid achievements={achievements} />
-        </div>
+        {/* Достижения — только когда выбрана конкретная коллекция */}
+        {activeCollection && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: EASE }}
+            className="mt-12"
+          >
+            <AchievementsGrid achievements={achievements} />
+          </motion.div>
+        )}
 
-        {/* Штамп */}
         <div className="mt-14 flex justify-center">
           <div className="inline-flex items-center gap-3 px-5 py-2
                           rounded-full bg-white/50 border border-[#F0E4D2] backdrop-blur-sm">

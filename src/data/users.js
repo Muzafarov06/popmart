@@ -1,5 +1,3 @@
-// src/data/users.js
-
 export const USERS = [
   {
     id: 'muzafon',
@@ -17,9 +15,9 @@ export const USERS = [
     email: 'yuzkov@popmart.local',
     name: 'Димон',
     role: 'player',
-    allowedCollections: ['company-of-friends'],
-    emoji: '🐳',
-    color: '#A0522D',
+    allowedCollections: ['company-of-friends', 'smeshariki'],
+    emoji: '🐻',
+    color: '#2e7fca',
   },
   {
     id: 'semenova',
@@ -27,8 +25,8 @@ export const USERS = [
     email: 'semenova@popmart.local',
     name: 'Настюха',
     role: 'player',
-    allowedCollections: ['company-of-friends'],
-    emoji: '🦄',
+    allowedCollections: ['company-of-friends', 'smeshariki'],
+    emoji: '🐰',
     color: '#FF8FA3',
   },
   {
@@ -37,9 +35,19 @@ export const USERS = [
     email: 'mitina@popmart.local',
     name: 'Сонька',
     role: 'player',
-    allowedCollections: ['company-of-friends'],
-    emoji: '🦋',
+    allowedCollections: ['company-of-friends', 'smeshariki'],
+    emoji: '🐹',
     color: '#FFB800',
+  },
+  {
+    id: 'veronika',
+    login: 'veronika',
+    email: 'veronika@popmart.local',
+    name: 'Вероника',
+    role: 'player',
+    allowedCollections: ['smeshariki'],
+    emoji: '🦢',
+    color: '#8B5CF6',
   },
 ];
 
