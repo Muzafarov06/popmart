@@ -14,18 +14,6 @@ import { CollectionTabs } from '@/components/ui';
 
 const EASE = [0.22, 1, 0.36, 1];
 
-/* ─── Иконка выхода ─── */
-function LogoutIcon({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-      <path d="M16 17l5-5-5-5" />
-      <path d="M21 12H9" />
-    </svg>
-  );
-}
-
 export default function Profile() {
   const { login } = useParams();
   const navigate = useNavigate();
@@ -130,7 +118,7 @@ export default function Profile() {
           </motion.div>
         )}
 
-        {/* ─── Кнопка выхода (мобилка) ─── */}
+        {/* ─── Выйти — просто текст (мобилка) ─── */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -139,15 +127,10 @@ export default function Profile() {
         >
           <button
             onClick={handleLogout}
-            className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl
-                       border border-[#F0E4D2] bg-white/70 backdrop-blur-sm
-                       text-[11px] font-black uppercase tracking-[0.22em]
-                       text-[#B87400]
-                       hover:bg-[#FFF4E0] hover:border-[#F0D0A0]
-                       active:scale-[0.97]
-                       transition-all"
+            className="text-[10px] uppercase tracking-[0.28em] font-bold
+                       text-zinc-500 hover:text-[#B87400]
+                       active:opacity-70 transition-colors"
           >
-            <LogoutIcon className="w-4 h-4" />
             Выйти
           </button>
         </motion.div>
