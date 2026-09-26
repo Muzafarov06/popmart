@@ -14,6 +14,9 @@ import {
   HomeEmpty,
 } from '@/components/home';
 
+const ACTIVE_COL_KEY = 'popmart_active_collection_id';
+const ACTIVE_COL_EVENT = 'popmart:active-collection-changed';
+
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -42,6 +45,17 @@ export default function Home() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [go, count]);
+
+  const activeId = collections[index]?.id;
+
+  /* ── Сообщаем хедеру, какая коллекция выбрана ── */
+  useEffect(() => {
+    if (!activeId) return;
+    localStorage.setItem(ACTIVE_COL_KEY, activeId);
+    window.dispatchEvent(
+      new CustomEvent(ACTIVE_COL_EVENT, { detail: { id: activeId } })
+    );
+  }, [activeId]);
 
   if (loading) return <HomeLoading />;
   if (error) return <HomeError message={error} />;

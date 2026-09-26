@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
 const LAST_SEEN_KEY = 'popmart_last_seen_feed_id';
+const ACTIVE_COL_KEY = 'popmart_active_collection_id';
+const ACTIVE_COL_EVENT = 'popmart:active-collection-changed';
 
 /* Глобальный кэш */
 let cache = null;
@@ -26,7 +28,9 @@ export function useHeaderData() {
   const cached = userId ? readCache(userId) : null;
 
   const [activeCollectionId, setActiveCollectionId] = useState(
-    cached?.activeCollectionId || null
+    cached?.activeCollectionId ||
+      (typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_COL_KEY) : null) ||
+      null
   );
   const [progress, setProgress] = useState(
     cached?.progress || { owned: 0, total: 0 }
@@ -51,8 +55,7 @@ export function useHeaderData() {
           .from('collections')
           .select('id, figures:figures(id)')
           .eq('is_active', true)
-          .order('sort_order')
-          .limit(1),
+          .order('sort_order'),
         (async () => {
           const lastSeen = Number(localStorage.getItem(LAST_SEEN_KEY) || 0);
           return supabase
@@ -68,7 +71,9 @@ export function useHeaderData() {
       const cols = colsRes.data;
       if (!cols?.length) return;
 
-      const col = cols[0];
+      // Уважаем выбор пользователя на главной, если он валиден
+      const storedId = localStorage.getItem(ACTIVE_COL_KEY);
+      const col = cols.find((c) => c.id === storedId) || cols[0];
       const total = col.figures?.length || 0;
 
       const { data: uf } = await supabase
@@ -105,7 +110,6 @@ export function useHeaderData() {
       setActiveCollectionId(fresh.activeCollectionId);
       setProgress(fresh.progress);
       setNewEventsCount(fresh.newEventsCount);
-      // тихое обновление
       load();
     } else {
       load();
@@ -114,12 +118,32 @@ export function useHeaderData() {
     return () => abortRef.current?.abort();
   }, [user, userId, load]);
 
+  /* ── Синхронизация с каруселью на главной ── */
+  useEffect(() => {
+    const handler = (e) => {
+      const id = e?.detail?.id || localStorage.getItem(ACTIVE_COL_KEY);
+      if (id) setActiveCollectionId(id);
+    };
+    const onStorage = (e) => {
+      if (e.key === ACTIVE_COL_KEY && e.newValue) {
+        setActiveCollectionId(e.newValue);
+      }
+    };
+
+    window.addEventListener(ACTIVE_COL_EVENT, handler);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(ACTIVE_COL_EVENT, handler);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
   /* ── Realtime ── */
   useEffect(() => {
     if (!user || !activeCollectionId) return;
 
     const channel = supabase
-      .channel('header-data')
+      .channel(`header-data-${activeCollectionId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'feed_events' },
@@ -161,7 +185,9 @@ export function useHeaderData() {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, activeCollectionId, userId]);
 
   const markAsRead = useCallback(async () => {
