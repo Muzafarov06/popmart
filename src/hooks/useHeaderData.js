@@ -1,5 +1,5 @@
 // src/hooks/useHeaderData.js
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
@@ -21,9 +21,20 @@ function writeCache(userId, data) {
   cache = { data, ts: Date.now(), userId };
 }
 
+/* Считаем, доступна ли коллекция игроку */
+function computeIsLocked(col, isAdmin) {
+  if (!col) return true;
+  const isActive = col.is_active !== false;
+  // null / undefined трактуем как "опубликована" (страховка от старых записей)
+  const isPublished = col.is_published !== false;
+  const canPlay = isActive && (isPublished || isAdmin);
+  return !canPlay;
+}
+
 export function useHeaderData() {
   const { user } = useAuth();
   const userId = user?.supabaseId || user?.login;
+  const isAdmin = user?.role === 'admin';
 
   const cached = userId ? readCache(userId) : null;
 
@@ -38,6 +49,8 @@ export function useHeaderData() {
   const [newEventsCount, setNewEventsCount] = useState(
     cached?.newEventsCount || 0
   );
+  // карта: { [collectionId]: isLocked }
+  const [locksMap, setLocksMap] = useState(cached?.locksMap || {});
 
   const abortRef = useRef(null);
 
@@ -53,7 +66,7 @@ export function useHeaderData() {
       const [colsRes, eventsCountRes] = await Promise.all([
         supabase
           .from('collections')
-          .select('id, figures:figures(id)')
+          .select('id, is_active, is_published, figures:figures(id)')
           .eq('is_active', true)
           .order('sort_order'),
         (async () => {
@@ -70,6 +83,12 @@ export function useHeaderData() {
 
       const cols = colsRes.data;
       if (!cols?.length) return;
+
+      // Считаем карту блокировок
+      const nextLocksMap = {};
+      for (const c of cols) {
+        nextLocksMap[c.id] = computeIsLocked(c, isAdmin);
+      }
 
       // Уважаем выбор пользователя на главной, если он валиден
       const storedId = localStorage.getItem(ACTIVE_COL_KEY);
@@ -89,16 +108,18 @@ export function useHeaderData() {
       setActiveCollectionId(col.id);
       setProgress({ owned, total });
       setNewEventsCount(count);
+      setLocksMap(nextLocksMap);
 
       writeCache(userId, {
         activeCollectionId: col.id,
         progress: { owned, total },
         newEventsCount: count,
+        locksMap: nextLocksMap,
       });
     } catch (e) {
       console.error('[useHeaderData]', e);
     }
-  }, [user, userId]);
+  }, [user, userId, isAdmin]);
 
   /* ── Первая загрузка + Realtime ── */
   useEffect(() => {
@@ -110,6 +131,7 @@ export function useHeaderData() {
       setActiveCollectionId(fresh.activeCollectionId);
       setProgress(fresh.progress);
       setNewEventsCount(fresh.newEventsCount);
+      setLocksMap(fresh.locksMap || {});
       load();
     } else {
       load();
@@ -161,6 +183,7 @@ export function useHeaderData() {
             activeCollectionId,
             progress,
             newEventsCount: newCount,
+            locksMap,
           });
         }
       )
@@ -178,6 +201,7 @@ export function useHeaderData() {
               activeCollectionId,
               progress: next,
               newEventsCount,
+              locksMap,
             });
             return next;
           });
@@ -188,7 +212,7 @@ export function useHeaderData() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, activeCollectionId, userId]);
+  }, [user, activeCollectionId, userId, progress, newEventsCount, locksMap]);
 
   const markAsRead = useCallback(async () => {
     const { data } = await supabase
@@ -206,5 +230,18 @@ export function useHeaderData() {
     }
   }, []);
 
-  return { activeCollectionId, progress, newEventsCount, markAsRead };
+  /* ── Активная коллекция заблокирована? ── */
+  const activeCollectionLocked = useMemo(() => {
+    if (!activeCollectionId) return true;
+    if (locksMap[activeCollectionId] === undefined) return false; // ещё не знаем — не блокируем
+    return locksMap[activeCollectionId];
+  }, [activeCollectionId, locksMap]);
+
+  return {
+    activeCollectionId,
+    activeCollectionLocked,
+    progress,
+    newEventsCount,
+    markAsRead,
+  };
 }

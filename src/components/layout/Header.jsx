@@ -449,7 +449,12 @@ export default function Header() {
   const userMenuRef = useRef(null);
 
   const { online, allowed, lastSeen } = useOnlineUsers();
-  const { activeCollectionId, newEventsCount, markAsRead } = useHeaderData();
+  const {
+  activeCollectionId,
+  activeCollectionLocked,
+  newEventsCount,
+  markAsRead,
+} = useHeaderData();
 
   useClickOutside([userMenuRef], open, () => setOpen(false));
 
@@ -685,11 +690,15 @@ export default function Header() {
           <div className="flex justify-center items-center">
             <button
               onClick={handleOpenBox}
-              disabled={!activeCollectionId || pathname.startsWith('/unbox')}
+              disabled={
+                !activeCollectionId ||
+                activeCollectionLocked ||
+                pathname.startsWith('/unbox')
+              }
               aria-label="Открыть коробку"
               className="text-[#FF9500] active:text-[#FF6B00]
-                         disabled:opacity-30 disabled:cursor-not-allowed
-                         transition-colors"
+                        disabled:opacity-30 disabled:cursor-not-allowed
+                        transition-colors"
             >
               <GiftIcon className="w-[24px] h-[24px]" />
             </button>
