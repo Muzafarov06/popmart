@@ -61,6 +61,16 @@ export const USERS = [
     emoji: '🐱',
     color: '#ff0000',
   },
+  {
+    id: 'klokova',
+    login: 'klokova',
+    email: 'klokova@popmart.local',
+    name: 'Ника',
+    role: 'player',
+    allowedCollections: ['smeshariki', 'tooniverse'],
+    emoji: '🍓',
+    color: '#6366f1',
+  },
 ];
 
 export const canViewCollection = (user, collectionId) => {
